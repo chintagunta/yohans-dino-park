@@ -823,7 +823,7 @@ export class Engine {
         if (!this.down.pet && !this.down.moved && Math.abs(dx) + Math.abs(dy) > 7) this.down.moved = true;
         if (this.down.moved) {
           this.follow = null;
-          this.camX = clamp(this.down.cam - dx / this.zoom, 0, WORLD_W - this.viewW);
+          this.camX = this.down.cam - dx / this.zoom;
           this.targetCam = this.camX;
           c.style.cursor = 'grabbing';
         }

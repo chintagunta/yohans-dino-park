@@ -4,7 +4,7 @@ import { InfoCard } from './components/InfoCard';
 import { FieldGuide } from './components/FieldGuide';
 import { Portrait } from './components/Portrait';
 import type { Callbacks, DinoInfo, Engine, Stats, ViewItem } from './game/engine';
-import { ERAS, SPECIES_BY_ID } from './game/species';
+import { ERAS, SPECIES, SPECIES_BY_ID } from './game/species';
 import { audio } from './game/audio';
 import type { Era, Species, Tool } from './game/types';
 
@@ -27,7 +27,7 @@ export default function App() {
   const [soundOpen, setSoundOpen] = useState(false);
   const [info, setInfo] = useState<DinoInfo | null>(null);
   const [view, setView] = useState<ViewItem[]>([]);
-  const [stats, setStats] = useState<Stats>({ fed: 0, pets: 0, discovered: 0, total: 33 });
+  const [stats, setStats] = useState<Stats>({ fed: 0, pets: 0, discovered: 0, total: SPECIES.length });
   const [zone, setZone] = useState<{ era: Era; name: string }>({ era: 'triassic', name: 'Fern Valley' });
   const [toast, setToast] = useState<string | null>(null);
   const [found, setFound] = useState<Species | null>(null);

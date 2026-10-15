@@ -23,6 +23,8 @@ export function Park({ callbacks, onEngine }: Props) {
     });
     onEngine(engine);
     engine.start();
+    const q = new URLSearchParams(location.search);
+    if (q.has('x')) engine.jumpTo(Number(q.get('x')));
 
     const ro = new ResizeObserver(() => engine.resize());
     ro.observe(canvas);
