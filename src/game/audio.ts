@@ -42,6 +42,7 @@ export class GameAudio {
   private lavaG!: GainNode;
   private bugG!: GainNode;
   private timer = 0;
+  private theme: HTMLAudioElement | null = null;
   private nextBeat = 0;
   private beat = 0;
   private birdT = 0;
@@ -83,7 +84,8 @@ export class GameAudio {
   setMusic(on: boolean) {
     this.musicOn = on;
     try { localStorage.setItem('dino-music', on ? '1' : '0'); } catch { /* ignore */ }
-    if (this.ctx) this.musicBus.gain.setTargetAtTime(on ? 0.5 : 0, this.ctx.currentTime, 0.4);
+    if (this.ctx) this.musicBus.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.4);
+    if (this.theme) { if (on) void this.theme.play().catch(() => undefined); else this.theme.pause(); }
   }
   private applyMaster() {
     if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime, 0.08);
@@ -104,7 +106,7 @@ export class GameAudio {
     this.master.connect(comp).connect(ctx.destination);
 
     this.musicBus = ctx.createGain();
-    this.musicBus.gain.value = this.musicOn ? 0.5 : 0;
+    this.musicBus.gain.value = this.musicOn ? 0.9 : 0;
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = 0.9;
     this.ambBus = ctx.createGain();
@@ -144,7 +146,26 @@ export class GameAudio {
     }
 
     this.buildAmbience();
-    this.nextBeat = ctx.currentTime + 0.3;
+    this.startMusic();
+  }
+
+  /** Background theme: the supplied MP3, looped. Falls back to the synthesized score if it can't load. */
+  private startMusic() {
+    const ctx = this.ctx!;
+    const el = new Audio(`${import.meta.env.BASE_URL}theme.mp3`);
+    el.loop = true;
+    el.preload = 'auto';
+    this.theme = el;
+    try {
+      ctx.createMediaElementSource(el).connect(this.musicBus);
+    } catch { /* fall through to plain element output */ }
+    el.addEventListener('error', () => this.startSynth(), { once: true });
+    if (this.musicOn) void el.play().catch(() => this.startSynth());
+  }
+
+  private startSynth() {
+    if (this.timer || !this.ctx) return;
+    this.nextBeat = this.ctx.currentTime + 0.3;
     this.timer = window.setInterval(() => this.schedule(), 120);
   }
 
@@ -434,6 +455,31 @@ export class GameAudio {
     this.tone(t, 60, 28, 3.2, 0.5, 'sine');
     this.burst(t, 3.5, 380, 0.7, this.sfxBus, 'lowpass', 0.6, 0, this.noiseB);
     this.burst(t + 0.2, 2.2, 900, 0.18, this.sfxBus, 'bandpass', 0.7);
+  }
+
+  /** Earthquake: deep rumble, grinding rock and falling debris for `dur` seconds. */
+  quake(mag: number, dur: number) {
+    if (!this.ready()) return;
+    const t = this.ctx!.currentTime;
+    const ctx = this.ctx!;
+    // sub-bass swell
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(34, t);
+    o.frequency.linearRampToValueAtTime(24, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.55 * mag + 0.2, t + 0.6);
+    g.gain.setValueAtTime(0.55 * mag + 0.2, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur + 1.2);
+    o.connect(g).connect(this.sfxBus);
+    o.start(t); o.stop(t + dur + 1.3);
+    this.burst(t, dur + 1, 200, 0.55 + mag * 0.3, this.sfxBus, 'lowpass', 0.6, 0, this.noiseB);
+    this.burst(t + 0.1, dur, 700, 0.12 + mag * 0.1, this.sfxBus, 'bandpass', 0.8);
+    const n = Math.round(6 + mag * 12);
+    for (let i = 0; i < n; i++) {
+      const tt = t + 0.4 + Math.random() * (dur - 0.4);
+      this.burst(tt, 0.12 + Math.random() * 0.2, 250 + Math.random() * 600, 0.1 + Math.random() * 0.12, this.sfxBus, 'bandpass', 1.2, rand(-0.8, 0.8));
+    }
   }
 
   /* ------------------------------------------------------- per-frame update */

@@ -427,6 +427,107 @@ const DEFS: Def[] = [
     colors: { body: '#e8a04a', belly: '#fbeed0', accent: '#c1452b', stripe: '#b87428' },
     shape: theropod({ bodyLen: 0.22, bodyH: 0.1, legH: 0.3, legW: 0.035, tilt: 0.1, neck: { len: 0.26, ang: 0.95, thick: 0.4 }, tail: { len: 0.35, droop: 0.02, lift: 0.05, thick: 0.55 }, head: head(0.08, 0.05, 'beak', 0.1), arms: 0.5, feats: F({ stripes: true }) }),
   },
+
+  /* ------------------------- sea reptiles ------------------------- */
+  {
+    id: 'nothosaurus', name: 'Nothosaurus', era: 'triassic', diet: 'piscivore', kind: 'Marine reptile', meaning: '"False lizard"',
+    length: 4, weight: '250 kg', count: 1, aquatic: true, speed: 36, sizeMul: 1.2,
+    fact: 'A Triassic sea hunter with webbed paddles and a mouth full of needle teeth. It hauled out on beaches like a seal.',
+    colors: { body: '#6a8f4a', belly: '#e6e3a8', accent: '#d98a2c', stripe: '#476a30' },
+    shape: {
+      kind: 'marine', bodyLen: 0.34, bodyH: 0.1, legH: 0.04, legW: 0.04, tilt: 0,
+      neck: { len: 0.22, ang: 0.45, thick: 0.4 }, tail: { len: 0.22, droop: 0, lift: 0 }, head: head(0.14, 0.05, 'long', 0.1),
+      feats: F({ marine: 'plesio', teeth: true, stripes: true }),
+    },
+  },
+  {
+    id: 'ichthyosaurus', name: 'Ichthyosaurus', era: 'jurassic', diet: 'piscivore', kind: 'Marine reptile', meaning: '"Fish lizard"',
+    length: 2, weight: '90 kg', count: 2, aquatic: true, speed: 70, sizeMul: 1.8,
+    fact: 'It looked just like a dolphin but was a reptile! Ichthyosaurs had huge eyes and gave birth to live young in the sea.',
+    colors: { body: '#4a86b8', belly: '#e8f1f2', accent: '#f0b44a', stripe: '#2f5f8f' },
+    shape: {
+      kind: 'marine', bodyLen: 0.46, bodyH: 0.13, legH: 0.04, legW: 0.04, tilt: 0,
+      neck: { len: 0.08, ang: 0.1, thick: 0.75 }, tail: { len: 0.26, droop: 0, lift: 0 }, head: head(0.19, 0.06, 'long', 0.05),
+      feats: F({ marine: 'ichthyo', teeth: true, fluke: true }),
+    },
+  },
+  {
+    id: 'liopleurodon', name: 'Liopleurodon', era: 'jurassic', diet: 'carnivore', kind: 'Marine reptile', meaning: '"Smooth-sided teeth"',
+    length: 7, weight: '1 tonne', count: 1, aquatic: true, speed: 46, sizeMul: 1.2,
+    fact: 'A fearsome sea predator with four big paddles and a massive crushing bite. Few things in the Jurassic ocean were safe from it.',
+    colors: { body: '#4f5d8e', belly: '#d9dcee', accent: '#e85a4a', stripe: '#323d66' },
+    shape: {
+      kind: 'marine', bodyLen: 0.44, bodyH: 0.15, legH: 0.04, legW: 0.04, tilt: 0,
+      neck: { len: 0.12, ang: 0.3, thick: 0.75 }, tail: { len: 0.18, droop: 0, lift: 0 }, head: head(0.28, 0.1, 'rex', 0.08),
+      feats: F({ marine: 'plesio', teeth: true }),
+    },
+  },
+  {
+    id: 'elasmosaurus', name: 'Elasmosaurus', era: 'cretaceous', diet: 'piscivore', kind: 'Marine reptile', meaning: '"Thin-plate lizard"',
+    length: 10, weight: '2 tonnes', count: 1, aquatic: true, speed: 32, sizeMul: 1.0,
+    fact: 'Half of its 10 metre body was neck! It swam gracefully with four flippers, snapping up fish with its tiny head.',
+    colors: { body: '#3d9a9a', belly: '#f1ecc2', accent: '#f08a4a', stripe: '#27706f' },
+    shape: {
+      kind: 'marine', bodyLen: 0.32, bodyH: 0.1, legH: 0.04, legW: 0.04, tilt: 0,
+      neck: { len: 0.62, ang: 0.62, thick: 0.35 }, tail: { len: 0.24, droop: 0, lift: 0 }, head: head(0.1, 0.045, 'long', 0.1),
+      feats: F({ marine: 'plesio', teeth: true }),
+    },
+  },
+  {
+    id: 'mosasaurus', name: 'Mosasaurus', era: 'cretaceous', diet: 'carnivore', kind: 'Marine reptile', meaning: '"Meuse lizard"',
+    length: 13, weight: '5 tonnes', count: 1, aquatic: true, speed: 58, sizeMul: 0.9,
+    fact: 'The giant lizard of the Cretaceous seas. Mosasaurus swept its tail like a shark and had two rows of teeth on its roof.',
+    colors: { body: '#4c7a68', belly: '#e0e6c4', accent: '#d9553a', stripe: '#2f5546' },
+    shape: {
+      kind: 'marine', bodyLen: 0.6, bodyH: 0.12, legH: 0.04, legW: 0.04, tilt: 0,
+      neck: { len: 0.1, ang: 0.1, thick: 0.7 }, tail: { len: 0.34, droop: 0, lift: 0 }, head: head(0.22, 0.08, 'rex', 0.06),
+      feats: F({ marine: 'mosa', teeth: true, fluke: true, stripes: true }),
+    },
+  },
+
+  /* ------------------------- flyers and birds ------------------------- */
+  {
+    id: 'eudimorphodon', name: 'Eudimorphodon', era: 'triassic', diet: 'piscivore', kind: 'Pterosaur', meaning: '"True two-form tooth"',
+    length: 1, weight: '10 kg', count: 2, flies: true, speed: 48, sizeMul: 1.7,
+    fact: 'One of the oldest flying reptiles. Fish scales were found in its stomach, so it likely skimmed the sea for dinner.',
+    colors: { body: '#4a9ad8', belly: '#e0f0fa', accent: '#f0a030', extra: '#6fb8e8' },
+    shape: { kind: 'ptero', bodyLen: 0.28, bodyH: 0.09, legH: 0.09, legW: 0.02, tilt: 0, neck: { len: 0.07, ang: 0.5 }, tail: { len: 0.36, droop: 0, lift: 0 }, head: head(0.18, 0.08, 'long', 0.1), feats: F({ longTail: true, teeth: true }) },
+  },
+  {
+    id: 'rhamphorhynchus', name: 'Rhamphorhynchus', era: 'jurassic', diet: 'piscivore', kind: 'Pterosaur', meaning: '"Beak snout"',
+    length: 1.3, weight: '2 kg', count: 2, flies: true, speed: 52, sizeMul: 1.7,
+    fact: 'It had a long stiff tail with a diamond-shaped rudder and sharp curved teeth that locked together to trap slippery fish.',
+    colors: { body: '#7a5fb8', belly: '#e8dcf6', accent: '#f2c14a', extra: '#9a7fd8' },
+    shape: { kind: 'ptero', bodyLen: 0.26, bodyH: 0.08, legH: 0.09, legW: 0.02, tilt: 0, neck: { len: 0.07, ang: 0.5 }, tail: { len: 0.46, droop: 0, lift: 0 }, head: head(0.2, 0.07, 'long', 0.1), feats: F({ longTail: true, teeth: true }) },
+  },
+  {
+    id: 'archaeopteryx', name: 'Archaeopteryx', era: 'jurassic', diet: 'omnivore', kind: 'Early bird', meaning: '"Ancient wing"',
+    length: 0.5, weight: '1 kg', count: 4, flies: true, speed: 60, sizeMul: 2.2,
+    fact: 'The famous first bird! It had feathered wings like a modern bird but also teeth and a long bony tail like a dinosaur.',
+    colors: { body: '#3a8f6a', belly: '#f4edc0', accent: '#e8573d', extra: '#2f6fb0' },
+    shape: { kind: 'ptero', bodyLen: 0.22, bodyH: 0.1, legH: 0.12, legW: 0.02, tilt: 0, neck: { len: 0.08, ang: 0.6 }, tail: { len: 0.3, droop: 0, lift: 0 }, head: head(0.12, 0.07, 'beak', 0.1), feats: F({ longTail: true, feathers: true }) },
+  },
+  {
+    id: 'quetzalcoatlus', name: 'Quetzalcoatlus', era: 'cretaceous', diet: 'piscivore', kind: 'Pterosaur', meaning: '"Feathered serpent god"',
+    length: 11, weight: '200 kg', count: 1, flies: true, speed: 44, sizeMul: 0.75,
+    fact: 'The largest flying animal ever, with wings as wide as a small plane. It stood as tall as a giraffe when walking on the ground.',
+    colors: { body: '#d8654a', belly: '#f8d8bc', accent: '#2f8f9a', extra: '#ec9a78' },
+    shape: { kind: 'ptero', bodyLen: 0.3, bodyH: 0.1, legH: 0.16, legW: 0.025, tilt: 0, neck: { len: 0.14, ang: 0.6 }, tail: { len: 0.08, droop: 0, lift: 0 }, head: head(0.4, 0.07, 'long', 0.06), feats: F({ wingCrest: 0.3 }) },
+  },
+  {
+    id: 'confuciusornis', name: 'Confuciusornis', era: 'cretaceous', diet: 'omnivore', kind: 'Early bird', meaning: '"Confucius bird"',
+    length: 0.5, weight: '0.5 kg', count: 5, flies: true, speed: 64, sizeMul: 2.2,
+    fact: 'One of the first birds with a toothless beak. Males grew two long ribbon-like tail feathers to impress their mates.',
+    colors: { body: '#e8a83a', belly: '#fff0c8', accent: '#d9453a', extra: '#58a8c8' },
+    shape: { kind: 'ptero', bodyLen: 0.2, bodyH: 0.1, legH: 0.12, legW: 0.02, tilt: 0, neck: { len: 0.07, ang: 0.6 }, tail: { len: 0.24, droop: 0, lift: 0 }, head: head(0.11, 0.07, 'beak', 0.1), feats: F({ longTail: true, feathers: true }) },
+  },
+  {
+    id: 'microraptor', name: 'Microraptor', era: 'cretaceous', diet: 'carnivore', kind: 'Feathered glider', meaning: '"Tiny thief"',
+    length: 0.8, weight: '1 kg', count: 3, flies: true, speed: 58, sizeMul: 2.0,
+    fact: 'A four-winged glider with long feathers on both its arms and legs. It leapt from tree to tree to hunt.',
+    colors: { body: '#2f5f9a', belly: '#d8e6f4', accent: '#e8b53a', extra: '#3f7fc0' },
+    shape: { kind: 'ptero', bodyLen: 0.24, bodyH: 0.09, legH: 0.12, legW: 0.02, tilt: 0, neck: { len: 0.08, ang: 0.6 }, tail: { len: 0.34, droop: 0, lift: 0 }, head: head(0.13, 0.07, 'long', 0.1), feats: F({ longTail: true, feathers: true, teeth: true }) },
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -435,8 +536,8 @@ function build(d: Def): Species {
   const s = d.shape;
   const size = Math.max(54, 28 * Math.pow(d.length, 0.8)) * (d.sizeMul ?? 1) * 1.7;
   const neckRise = Math.max(0, s.neck.len * Math.sin(s.neck.ang)) * 0.9;
-  const base = s.kind === 'ptero' ? 0.3 : s.kind === 'turtle' ? s.bodyH * 0.8 : s.legH + s.bodyH + neckRise + s.head.h * 0.4;
-  const hitW = s.kind === 'ptero' ? 0.8 : s.kind === 'turtle' ? 0.6 : Math.min(1.0, s.bodyLen + s.neck.len * 0.5 + s.tail.len * 0.3);
+  const base = s.kind === 'ptero' ? 0.3 : s.kind === 'turtle' || s.kind === 'marine' ? s.bodyH * 0.8 : s.legH + s.bodyH + neckRise + s.head.h * 0.4;
+  const hitW = s.kind === 'ptero' ? 0.8 : s.kind === 'turtle' ? 0.6 : s.kind === 'marine' ? 0.7 : Math.min(1.0, s.bodyLen + s.neck.len * 0.5 + s.tail.len * 0.3);
   return {
     id: d.id, name: d.name, era: d.era, diet: d.diet, kind: d.kind ?? 'Dinosaur', meaning: d.meaning,
     length: d.length, weight: d.weight, fact: d.fact, count: d.count ?? 1, shape: s, colors: d.colors,

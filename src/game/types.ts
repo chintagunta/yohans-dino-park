@@ -33,10 +33,12 @@ export interface Feats {
   longTail?: boolean; // pterosaur with long tail
   flipper?: number; // turtle flipper size
   boxShell?: boolean;
+  marine?: 'plesio' | 'ichthyo' | 'mosa'; // sea-reptile body plan
+  fluke?: boolean;
 }
 
 export interface Shape {
-  kind: 'quad' | 'biped' | 'turtle' | 'ptero';
+  kind: 'quad' | 'biped' | 'turtle' | 'ptero' | 'marine';
   bodyLen: number;
   bodyH: number;
   legH: number;

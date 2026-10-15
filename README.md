@@ -21,3 +21,13 @@ npm run build
 ## Sound
 All audio is synthesised (no files): an original adventure-style orchestral theme, wind, birds, insects, water, volcano rumble and eruption
 booms, footsteps scaled by animal size, roars, calls, munching and purring. Sound starts after your first click (browser rule).
+
+
+## Update: more life, quakes and phone mode
+
+- **Sea reptiles** (Nothosaurus, Ichthyosaurus, Liopleurodon, Elasmosaurus, Mosasaurus) live in the lakes and rivers.
+- **Flyers and birds** (Eudimorphodon, Rhamphorhynchus, Archaeopteryx, Quetzalcoatlus, Confuciusornis, Microraptor) fly in flocks.
+- **Earthquakes** strike at random (more often near volcanoes): the screen shakes, cracks open and dinosaurs panic. Press **Q** to trigger one.
+- **Background herds** of running dinosaurs (sometimes chased by raiders) and bird flocks cross the scenery.
+- **Music** is `public/theme.mp3` (looped). Replace that file to change the track.
+- **Phones**: only a music button is shown; drag to look around.

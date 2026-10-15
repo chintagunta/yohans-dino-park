@@ -127,3 +127,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sound-pop .row { display: flex; align-items: center; gap: 8px; }
 .sound-pop .vol { justify-content: space-between; }
 .sound-pop input[type='range'] { width: 100px; accent-color: var(--navy); }
+
+/* ------------------------------------------------------------------ phones
+   On a phone the canvas gets the whole screen: only the music button remains. */
+.music-fab { display: none; }
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  .topbar, .tray, .info-card, .found, .dock-wrap, .minimap, .help { display: none !important; }
+  .music-fab {
+    display: grid; place-items: center; position: absolute; top: 10px; right: 10px; z-index: 6;
+    width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; background: rgba(14, 59, 85, 0.82);
+    color: #fff; font-size: 22px; line-height: 1; box-shadow: var(--shadow); padding: 0; cursor: pointer;
+  }
+  .music-fab.off { background: rgba(80, 80, 80, 0.7); }
+  .toast { top: 12px; bottom: auto; left: 12px; right: 68px; transform: none; font-size: 14px; text-align: left; }
+}

@@ -69,7 +69,13 @@ interface Dino {
   waypoints: number;
   stepIdx: number;
   look: Species;
+  panic: number;
 }
+interface HerdMember { dx: number; dy: number; ph: number; sc: number; look: Species; pose: Pose }
+interface Herd {
+  air: boolean; x: number; y: number; dir: 1 | -1; speed: number; age: number; members: HerdMember[];
+}
+interface Crack { x: number; y: number; len: number; seed: number }
 interface Particle {
   x: number; y: number; vx: number; vy: number; g: number;
   life: number; max: number;
@@ -92,6 +98,11 @@ export class Engine {
   private populated = new Set<number>();
   private pending: { id: string; until: number } | null = null;
   private popT = 0;
+  private herds: Herd[] = [];
+  private herdT = 2;
+  private quake = { t: 0, dur: 0, mag: 0 };
+  private quakeT = 40 + Math.random() * 30;
+  private cracks: Crack[] = [];
   private dinos: Dino[] = [];
   private foods: Food[] = [];
   private parts: Particle[] = [];
@@ -210,6 +221,7 @@ export class Engine {
     this.emitSelected();
   }
   deselect() { this.select(null); }
+  triggerQuake() { this.startQuake(0.6 + this.rnd() * 0.4); }
 
   getInfo(): DinoInfo | null {
     const d = this.selected;
@@ -250,9 +262,17 @@ export class Engine {
     const aquatic = SPECIES.filter((s) => s.aquatic);
     for (let g = 0; g < groups; g++) {
       let sp: Species;
-      if (hasWater && g === 0 && rnd() < 0.5) sp = aquatic[Math.floor(rnd() * aquatic.length)];
+      if (hasWater && g === 0 && rnd() < 0.7) {
+        const w = aquatic.map((s) => (s.era === ch.era ? 3 : 1));
+        let r = rnd() * w.reduce((x, y) => x + y, 0);
+        sp = aquatic[0];
+        for (let i = 0; i < aquatic.length; i++) {
+          r -= w[i];
+          if (r <= 0) { sp = aquatic[i]; break; }
+        }
+      }
       else {
-        const w = land.map((s) => (s.era === ch.era ? 3 : 0.7) * (s.flies ? 0.7 : 1) * (ch.volcano && s.era === 'jurassic' ? 1.3 : 1));
+        const w = land.map((s) => (s.era === ch.era ? 3 : 0.7) * (s.flies ? 1.1 : 1) * (ch.volcano && s.era === 'jurassic' ? 1.3 : 1));
         let r = rnd() * w.reduce((a, b) => a + b, 0);
         sp = land[0];
         for (let i = 0; i < land.length; i++) {
@@ -285,7 +305,7 @@ export class Engine {
       state: sp.flies ? 'fly' : 'idle', stateT: rnd() * 3, tx: x, ty: y, tz: 0, pose: makePose({ phase: rnd() * 6 }),
       scale: 0.9 + rnd() * 0.2, hunger: 0.2 + rnd() * 0.5, affection: 0.2, home: { x: hx, y }, leash: sp.flies ? 900 : 480,
       food: null, think: rnd(), refuseCd: 0, petCd: 0, petHold: 0, blinkT: 1 + rnd() * 3, fed: 0, pets: 0, bubble: null,
-      bubbleCd: 6 + rnd() * 10, roar: 0, life: rnd() * 10, blockedFlag: false, fx: 0, waypoints: 0, stepIdx: 0,
+      bubbleCd: 6 + rnd() * 10, roar: 0, life: rnd() * 10, blockedFlag: false, fx: 0, waypoints: 0, stepIdx: 0, panic: 0,
     };
     if (sp.flies) this.pickFly(d);
     this.dinos.push(d);
@@ -303,6 +323,8 @@ export class Engine {
 
     for (const d of this.dinos) this.updateDino(d, dt);
     this.updateAudio(dt);
+    this.updateHerds(dt);
+    this.updateQuake(dt);
     this.popT -= dt;
     if (this.popT <= 0) {
       this.popT = 0.5;
@@ -403,6 +425,10 @@ export class Engine {
     if (d.blinkT <= 0) { p.blink = 1; d.blinkT = 2 + rnd() * 4; }
     p.blink = Math.max(0, p.blink - dt * 7);
     d.petHold = Math.max(0, d.petHold - dt);
+    if (d.panic > 0) {
+      d.panic -= dt;
+      if (!sp.flies && !sp.aquatic && (d.state === 'idle' || d.state === 'graze' || d.state === 'sleep' || d.state === 'refuse') && this.pickWander(d)) this.enter(d, 'walk', 3 + rnd() * 2);
+    }
 
     const inW = inWater(d.x, d.y, 0.97);
     const wantSwim = (sp.aquatic || sp.swims) && inW && d.z < 2 ? 1 : 0;
@@ -430,7 +456,7 @@ export class Engine {
         if (sp.diet === 'carnivore' && !sp.flies && d.stateT > 0 && d.roar <= 0 && rnd() < dt * 0.02) { d.roar = 1; this.say(d, 'RAWR!', 1.2); if (this.onScreen(d)) audio.roar(S, this.pan(d.x)); }
         break;
       case 'walk': {
-        const dist = this.moveTo(d, d.tx, d.ty, sp.speed * d.scale * (p.swim > 0.5 ? 0.6 : 1), dt);
+        const dist = this.moveTo(d, d.tx, d.ty, sp.speed * d.scale * (p.swim > 0.5 ? 0.6 : 1) * (d.panic > 0 ? 2.3 : 1), dt);
         speed = Math.hypot(d.vx, d.vy);
         if (dist < 10 || d.blockedFlag || d.stateT <= 0) this.enter(d, 'idle', 0.6 + rnd() * 2.5);
         break;
@@ -576,7 +602,7 @@ export class Engine {
       p.phase += dt * (airborne ? (glide ? 4 : 9) : 0);
       if (!airborne) p.phase += dt * Math.min(12, Math.hypot(d.vx, d.vy) / (S * 0.08));
       p.moving = approach(p.moving, airborne ? 0 : clamp(Math.hypot(d.vx, d.vy) / 40, 0, 1), dt * 4);
-    } else if (sp.shape.kind === 'turtle') {
+    } else if (sp.shape.kind === 'turtle' || sp.shape.kind === 'marine') {
       p.phase += dt * (2.2 + Math.hypot(d.vx, d.vy) / 12);
       p.moving = approach(p.moving, clamp(Math.hypot(d.vx, d.vy) / 25, 0, 1), dt * 3);
     } else {
@@ -876,6 +902,194 @@ export class Engine {
     });
   }
 
+
+  /* ------------------------------------------------------------ earthquakes */
+
+  private startQuake(mag: number) {
+    if (this.quake.t > 0) return;
+    const dur = 3.5 + mag * 3;
+    this.quake = { t: dur, dur, mag };
+    this.cracks = [];
+    for (let i = 0; i < 7; i++) {
+      this.cracks.push({ x: this.camX + this.rnd() * this.viewW, y: lerp(GROUND_MIN + 10, GROUND_MAX - 10, this.rnd()), len: 60 + this.rnd() * 120, seed: this.rnd() * 100 });
+    }
+    this.cb.onToast('Earthquake! The ground is shaking! 🌋');
+    audio.quake(mag, dur);
+    const cx = this.camX + this.viewW / 2;
+    for (const d of this.dinos) {
+      if (Math.abs(d.x - cx) > this.viewW * 1.1 || d.sp.aquatic) continue;
+      d.panic = dur + 2.5;
+      if (d.state === 'sleep') this.enter(d, 'idle', 0.1);
+      if (!d.sp.flies && this.rnd() < 0.5) this.say(d, '😱', 2);
+      if (!d.sp.flies && d.sp.length > 6 && this.rnd() < 0.3 && this.onScreen(d)) {
+        d.roar = 1;
+        audio.roar(d.sp.size * d.scale * depthScale(d.y), this.pan(d.x));
+      }
+    }
+  }
+
+  private quakeEnv() {
+    const q = this.quake;
+    if (q.t <= 0) return 0;
+    const k = 1 - q.t / q.dur;
+    return q.mag * Math.pow(Math.sin(Math.PI * k), 0.6);
+  }
+
+  private updateQuake(dt: number) {
+    if (this.quake.t > 0) {
+      this.quake.t -= dt;
+      const env = this.quakeEnv();
+      if (this.rnd() < env * dt * 45) {
+        const x = this.camX + this.rnd() * this.viewW;
+        const y = lerp(GROUND_MIN, GROUND_MAX, this.rnd());
+        this.spawnPart({ x, y, vx: (this.rnd() - 0.5) * 40, vy: -40 - this.rnd() * 60, g: 160, life: 1.1, max: 1.1, kind: 'crumb', size: 3 + this.rnd() * 4, color: this.rnd() > 0.5 ? '#b89a6a' : '#8a6f4a' });
+      }
+      return;
+    }
+    this.quakeT -= dt;
+    if (this.quakeT <= 0) {
+      const vn = volcanoNear(this.camX + this.viewW / 2);
+      this.quakeT = (vn ? 45 : 85) + this.rnd() * 60;
+      this.startQuake(0.4 + this.rnd() * 0.6);
+    }
+  }
+
+  /* -------------------------------------------------- background herds / flocks */
+
+  private herdS(h: Herd, m: HerdMember) {
+    return h.air ? m.look.size * 0.3 * m.sc : m.look.size * depthScale(h.y) * 0.85 * m.sc;
+  }
+
+  private spawnHerd() {
+    const rnd = this.rnd;
+    const cx = this.camX + this.viewW / 2;
+    const era = zoneAt(cx).era;
+    const dir: 1 | -1 = rnd() < 0.5 ? 1 : -1;
+    const startX = dir === 1 ? this.camX - 550 : this.camX + this.viewW + 550;
+    const pick = (pool: Species[]) => {
+      const w = pool.map((s) => (s.era === era ? 3 : 1));
+      let r = rnd() * w.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+      return pool[0];
+    };
+    const make = (sp: Species, n: number, air: boolean, x: number, y: number, speed: number): Herd => {
+      const deg = rnd() < 0.5 ? 0 : (rnd() < 0.5 ? -1 : 1) * Math.round(30 + rnd() * 120);
+      const look = variantOf(sp, deg, 0);
+      const members: HerdMember[] = [];
+      for (let i = 0; i < n; i++) {
+        members.push({
+          dx: (rnd() - 0.5) * (air ? 260 : 190) - dir * i * 6, dy: air ? (rnd() - 0.5) * 70 : (rnd() - 0.5) * 16,
+          ph: rnd() * 6, sc: 0.85 + rnd() * 0.3, look,
+          pose: makePose({ moving: 1, flap: 1, fold: 0, phase: rnd() * 6 }),
+        });
+      }
+      members.sort((a, b) => a.dy - b.dy);
+      return { air, x, y, dir, speed, age: 0, members };
+    };
+    if (rnd() < 0.35) {
+      const pool = SPECIES.filter((s) => s.flies);
+      const sp = pick(pool);
+      this.herds.push(make(sp, 5 + Math.floor(rnd() * 6), true, startX, 90 + rnd() * 150, 80 + rnd() * 60));
+      return;
+    }
+    const pool = SPECIES.filter((s) => !s.aquatic && !s.flies && s.diet !== 'carnivore' && s.diet !== 'piscivore' && s.length >= 2 && s.length <= 14);
+    const sp = pick(pool);
+    const speed = clamp(sp.speed * 1.7, 90, 210) * (0.9 + rnd() * 0.2);
+    const y = 388 + rnd() * 18;
+    this.herds.push(make(sp, 5 + Math.floor(rnd() * 5), false, startX, y, speed));
+    if (rnd() < 0.35) {
+      const preds = SPECIES.filter((s) => !s.aquatic && !s.flies && (s.diet === 'carnivore') && s.length >= 1.5 && s.length <= 9);
+      const ps = pick(preds);
+      this.herds.push(make(ps, 3, false, startX - dir * 460, y + 6, speed * 1.08));
+    }
+  }
+
+  private updateHerds(dt: number) {
+    this.herdT -= dt;
+    if (this.herdT <= 0) {
+      this.herdT = 7 + this.rnd() * 9;
+      if (this.herds.length < 4) this.spawnHerd();
+    }
+    const cx = this.camX + this.viewW / 2;
+    for (const h of this.herds) {
+      h.x += h.dir * h.speed * dt;
+      h.age += dt;
+      for (const m of h.members) {
+        const S = this.herdS(h, m);
+        const p = m.pose;
+        p.t = this.time + m.ph;
+        if (h.air) p.phase += dt * 9;
+        else p.phase += dt * Math.min(15, h.speed / Math.max(8, S * 0.075));
+      }
+    }
+    this.herds = this.herds.filter((h) => Math.abs(h.x - cx) < 3200 && h.age < 90 && !(h.dir === 1 ? h.x > this.camX + this.viewW + 700 : h.x < this.camX - 700));
+  }
+
+  private drawHerds(air: boolean) {
+    const ctx = this.ctx;
+    const t = this.time;
+    ctx.save();
+    ctx.translate(-this.camX, 0);
+    for (const h of this.herds) {
+      if (h.air !== air) continue;
+      for (const m of h.members) {
+        const x = h.x + m.dx;
+        if (x < this.camX - 200 || x > this.camX + this.viewW + 200) continue;
+        const S = this.herdS(h, m);
+        const y = air ? h.y + m.dy + Math.sin(t * 1.4 + m.ph) * 7 : h.y + m.dy;
+        if (!air) {
+          ellipse(ctx, x, y + 2, S * 0.36, S * 0.07);
+          ctx.fillStyle = 'rgba(20,40,20,0.22)';
+          ctx.fill();
+          for (let k = 0; k < 3; k++) {
+            const f = (t * 1.7 + m.ph + k / 3) % 1;
+            ctx.beginPath();
+            ctx.arc(x - h.dir * S * (0.3 + f * 0.8), y - S * 0.04 - f * S * 0.16, S * (0.04 + f * 0.1), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(200,170,120,${0.32 * (1 - f)})`;
+            ctx.fill();
+          }
+        }
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(S * h.dir, S);
+        if (air) ctx.globalAlpha = 0.92;
+        drawDino(ctx, m.look, m.pose, S);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawCracks() {
+    const env = this.quakeEnv();
+    if (env <= 0.02) return;
+    const ctx = this.ctx;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const c of this.cracks) {
+      const grow = clamp(1 - this.quake.t / this.quake.dur * 1.4, 0, 1);
+      const len = c.len * (0.4 + grow * 0.6);
+      const fade = this.quake.t < 1.2 ? this.quake.t / 1.2 : 1;
+      const pts: [number, number][] = [[c.x, c.y]];
+      let px = c.x, py = c.y;
+      const r = mulberry32((c.seed * 977) | 0);
+      for (let i = 0; i < 9; i++) {
+        px += (len / 9) * (0.6 + r() * 0.8);
+        py += (r() - 0.5) * 12;
+        pts.push([px, py]);
+      }
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const p of pts) ctx.lineTo(p[0], p[1]);
+      ctx.strokeStyle = `rgba(35,22,14,${0.8 * fade})`;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(0,0,0,${0.9 * fade})`;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+    }
+  }
+
   /* ---------------------------------------------------------------- render */
 
   private render() {
@@ -883,13 +1097,23 @@ export class Engine {
     const t = this.time;
     ctx.setTransform(this.dpr * this.zoom, 0, 0, this.dpr * this.zoom, 0, 0);
     ctx.clearRect(0, 0, this.viewW, WORLD_H);
+    const env = this.quakeEnv();
+    if (env > 0) {
+      const amp = env * 6;
+      ctx.translate(this.viewW / 2, WORLD_H / 2);
+      ctx.scale(1.025, 1.025);
+      ctx.translate(-this.viewW / 2 + (Math.random() - 0.5) * 2 * amp, -WORLD_H / 2 + (Math.random() - 0.5) * 2 * amp);
+    }
     drawBackdrop(ctx, this.camX, this.viewW, t);
+    this.drawHerds(true);
     ensureGround(this.camX, this.camX + this.viewW);
     drawGround(ctx, this.camX, this.viewW);
     drawLiquidFx(ctx, this.camX, this.viewW, t);
+    this.drawHerds(false);
 
     ctx.save();
     ctx.translate(-this.camX, 0);
+    this.drawCracks();
     const x0 = this.camX - 260, x1 = this.camX + this.viewW + 260;
 
     type Item = { y: number; k: 0 | 1 | 2; d?: import('./draw/flora').Decor; dino?: Dino; food?: Food };
@@ -918,6 +1142,11 @@ export class Engine {
 
     drawForeground(ctx, this.camX, this.viewW, t);
 
+    if (env > 0) {
+      ctx.setTransform(this.dpr * this.zoom, 0, 0, this.dpr * this.zoom, 0, 0);
+      ctx.fillStyle = `rgba(120,90,50,${env * 0.16})`;
+      ctx.fillRect(0, 0, this.viewW, WORLD_H);
+    }
     // gentle vignette
     const vg = ctx.createRadialGradient(this.viewW / 2, WORLD_H / 2, WORLD_H * 0.55, this.viewW / 2, WORLD_H / 2, Math.max(this.viewW, WORLD_H) * 0.75);
     vg.addColorStop(0, 'rgba(20,40,20,0)');

@@ -1,5 +1,5 @@
 import type { Pose, Shape, Species } from '../types';
-import { clamp, lerp, Pt, shade, smoothClosed } from './util';
+import { clamp, lerp, Pt, shade, smoothClosed, smoothstep } from './util';
 
 /* -------------------------------------------------------------------------- */
 /*  Procedural, side-view dinosaur renderer.                                  */
@@ -1090,6 +1090,169 @@ function drawTurtle(c: Ctx2) {
   ctx.restore();
 }
 
+
+/* -------------------------------------------------------------------------- */
+/*  Sea reptiles: plesiosaurs, ichthyosaurs, mosasaurs                        */
+/* -------------------------------------------------------------------------- */
+
+function drawMarine(c: Ctx2) {
+  const { ctx, sp, pose, lw, ol, far } = c;
+  const sh = sp.shape;
+  const col = sp.colors;
+  const f = sh.feats ?? {};
+  const plan = f.marine ?? 'plesio';
+  const bl = sh.bodyLen;
+  const tl = sh.tail.len;
+  const nl = sh.neck.len;
+  const bh = sh.bodyH * 1.45;
+  const x0 = -bl / 2 - tl;
+  const x1 = bl / 2 + nl;
+  const u0 = plan === 'plesio' ? 0.3 : plan === 'ichthyo' ? 0.4 : 0.45;
+  const u1 = plan === 'plesio' ? 0.5 : plan === 'ichthyo' ? 0.62 : 0.65;
+  const neckW = sh.neck.thick ?? 0.5;
+  const rise = plan === 'plesio' ? nl * sh.neck.ang * 1.1 : 0;
+  const porpoise = plan === 'plesio' ? 0.006 : 0.03;
+  const baseY = -0.05 - bh * 0.1 + Math.sin(pose.t * 1.3) * porpoise;
+  const N = 30;
+  const top: Pt[] = [];
+  const bot: Pt[] = [];
+  const mid: Pt[] = [];
+  const amp = 0.012 + pose.moving * 0.03;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const x = lerp(x0, x1, u);
+    const nu = smoothstep(u1, 1, u);
+    const wave = Math.sin(pose.phase * 1.4 - u * 4.5) * amp * (1 - u) * (plan === 'plesio' ? 0.4 : 1);
+    const y = baseY + wave - rise * Math.pow(nu, 1.5);
+    const w =
+      bh *
+      (u < u0
+        ? lerp(0.05, 1, smoothstep(0, u0, u))
+        : u < u1
+          ? 1
+          : lerp(1, neckW * (plan === 'plesio' ? 0.38 : 0.7), nu)) *
+      0.5;
+    mid.push([x, y]);
+    top.push([x, y - w * 1.0]);
+    bot.push([x, y + w * 0.85]);
+  }
+  const hp = mid[N];
+  const lp = mid[0];
+  const lwl = lw;
+  ctx.lineJoin = 'round';
+
+  const flipper = (px: number, py: number, len: number, wid: number, rot: number, fill: string) => {
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.moveTo(0, -wid * 0.5);
+    ctx.quadraticCurveTo(len * 0.6, -wid * 0.9, len, -wid * 0.1);
+    ctx.quadraticCurveTo(len * 0.5, wid * 0.7, 0, wid * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = lwl;
+    ctx.strokeStyle = ol;
+    ctx.stroke();
+    ctx.restore();
+  };
+  const fa = (off: number) => Math.sin(pose.phase * 1.3 + off) * (0.25 + pose.moving * 0.4);
+  const fF = plan === 'plesio' ? 0.9 : 0.5;
+  const front = mid[Math.round(N * 0.6)];
+  const rear = mid[Math.round(N * 0.34)];
+  const fl = (plan === 'plesio' ? 0.2 : 0.12) * (0.6 + bl);
+
+  // far flippers
+  flipper(front[0], front[1] + bh * 0.3, fl, 0.05, 1.0 + fa(Math.PI) * fF, far);
+  flipper(rear[0], rear[1] + bh * 0.3, fl * 0.9, 0.045, 1.9 + fa(1) * fF, far);
+
+  // tail fluke
+  const wob = Math.sin(pose.phase * 1.4) * 0.35;
+  if (f.fluke) {
+    ctx.save();
+    ctx.translate(lp[0], lp[1]);
+    ctx.rotate(wob);
+    ctx.beginPath();
+    ctx.moveTo(0.02, 0);
+    ctx.quadraticCurveTo(-0.02, -0.11, -0.08, -0.15);
+    ctx.quadraticCurveTo(-0.045, -0.04, -0.045, 0);
+    ctx.quadraticCurveTo(-0.045, 0.045, -0.06, 0.1);
+    ctx.quadraticCurveTo(-0.01, 0.07, 0.02, 0);
+    ctx.closePath();
+    ctx.fillStyle = col.accent;
+    ctx.fill();
+    ctx.lineWidth = lwl;
+    ctx.strokeStyle = ol;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // dorsal fin
+  if (plan !== 'plesio') {
+    const dp = mid[Math.round(N * 0.5)];
+    ctx.beginPath();
+    ctx.moveTo(dp[0] - 0.07, dp[1] - bh * 0.45);
+    ctx.quadraticCurveTo(dp[0] - 0.04, dp[1] - bh * 0.45 - 0.09, dp[0] + 0.01, dp[1] - bh * 0.45 - 0.1);
+    ctx.quadraticCurveTo(dp[0] + 0.0, dp[1] - bh * 0.45 - 0.04, dp[0] + 0.05, dp[1] - bh * 0.4);
+    ctx.closePath();
+    ctx.fillStyle = col.accent;
+    ctx.fill();
+    ctx.lineWidth = lwl;
+    ctx.strokeStyle = ol;
+    ctx.stroke();
+  }
+
+  // body
+  const poly: Pt[] = [...top, ...bot.slice().reverse()];
+  ctx.beginPath();
+  smoothClosed(ctx, poly);
+  const yt = baseY - bh * 0.55 - rise, yb = baseY + bh * 0.5;
+  const g = ctx.createLinearGradient(0, yt, 0, yb);
+  g.addColorStop(0, shade(col.body, 0.18));
+  g.addColorStop(0.5, col.body);
+  g.addColorStop(0.62, col.belly);
+  g.addColorStop(1, shade(col.belly, -0.12));
+  ctx.fillStyle = g;
+  ctx.fill();
+  if (f.stripes) {
+    ctx.save();
+    ctx.clip();
+    ctx.strokeStyle = col.stripe ?? shade(col.body, -0.3);
+    ctx.lineWidth = bh * 0.1;
+    for (let i = 2; i < N - 4; i += 3) {
+      ctx.beginPath();
+      ctx.moveTo(top[i][0], top[i][1]);
+      ctx.lineTo(top[i][0] - 0.02, mid[i][1] + bh * 0.1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.beginPath();
+  smoothClosed(ctx, poly);
+  ctx.lineWidth = lwl;
+  ctx.strokeStyle = ol;
+  ctx.stroke();
+  // highlight
+  ctx.beginPath();
+  ctx.moveTo(top[Math.round(N * 0.3)][0], top[Math.round(N * 0.3)][1] + 0.012);
+  for (let i = Math.round(N * 0.3); i <= Math.round(N * 0.62); i++) ctx.lineTo(top[i][0], top[i][1] + 0.014);
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = 0.012;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  // near flippers
+  flipper(front[0], front[1] + bh * 0.3, fl * 1.05, 0.06, 0.85 + fa(0) * fF, col.body);
+  flipper(rear[0], rear[1] + bh * 0.3, fl * 0.95, 0.05, 1.75 + fa(2) * fF, col.body);
+
+  // head
+  const prev = mid[N - 1];
+  const ang = Math.atan2(hp[1] - prev[1], hp[0] - prev[0]);
+  drawHead({ ...c, lw: lwl }, hp[0], hp[1], (sh.head.ang ?? 0.05) + pose.headLower * 0.4 - ang * 0.3);
+}
+
 /* -------------------------------------------------------------------------- */
 
 export function drawDino(ctx: CanvasRenderingContext2D, sp: Species, pose: Pose, px: number) {
@@ -1101,7 +1264,7 @@ export function drawDino(ctx: CanvasRenderingContext2D, sp: Species, pose: Pose,
 
   const swim = pose.swim;
   if (swim > 0.01) {
-    const turtle = sh.kind === 'turtle';
+    const turtle = sh.kind === 'turtle' || sh.kind === 'marine';
     const waterY = turtle ? -0.035 : -sh.bodyH * 0.12 - 0.01;
     ctx.beginPath();
     ctx.rect(-4, -6, 8, 6 + waterY);
@@ -1111,6 +1274,7 @@ export function drawDino(ctx: CanvasRenderingContext2D, sp: Species, pose: Pose,
 
   if (sh.kind === 'ptero') drawPtero(c);
   else if (sh.kind === 'turtle') drawTurtle(c);
+  else if (sh.kind === 'marine') drawMarine(c);
   else drawLand(c);
   ctx.restore();
 }
@@ -1123,8 +1287,9 @@ export function drawPortrait(canvas: HTMLCanvasElement, sp: Species, opts: { dim
   ctx.clearRect(0, 0, w, h);
   const sh = sp.shape;
   let uw = 1.05, uh = sp.hitH + 0.06;
-  if (sh.kind === 'ptero') { uw = 1.5; uh = 0.75; }
+  if (sh.kind === 'ptero') { uw = 1.6; uh = 0.95; }
   if (sh.kind === 'turtle') { uw = 0.95; uh = 0.34; }
+  if (sh.kind === 'marine') { uw = 0.3 + sh.bodyLen + sh.tail.len + sh.neck.len + sh.head.len * 1.3; uh = 0.12 + sh.neck.len * sh.neck.ang * 1.1; }
   const scale = Math.min((w * 0.94) / uw, (h * 0.9) / uh);
   ctx.save();
   ctx.translate(w / 2, h * 0.5 + (uh * scale) / 2 - (sh.kind === 'ptero' ? uh * scale * 0.05 : 0) - h * 0.02);
@@ -1132,7 +1297,7 @@ export function drawPortrait(canvas: HTMLCanvasElement, sp: Species, opts: { dim
   const pose = makePose({ t: 1.2, headLower: 0, flap: 0.6, phase: 0.9, fold: 0 });
   if (opts.dim) ctx.filter = 'grayscale(1) brightness(0.55) contrast(0.8)';
   // centre horizontally using the rough bounding box of the unit space
-  const cx = sh.kind === 'turtle' ? 0.08 : sh.kind === 'ptero' ? -0.05 : (sh.neck.len * 0.3 - sh.tail.len * 0.3) * 0.5;
+  const cx = sh.kind === 'marine' ? (sh.neck.len - sh.tail.len) * 0.5 : sh.kind === 'turtle' ? 0.08 : sh.kind === 'ptero' ? -0.05 : (sh.neck.len * 0.3 - sh.tail.len * 0.3) * 0.5;
   ctx.translate(-cx, 0);
   drawDino(ctx, sp, pose, scale);
   ctx.restore();

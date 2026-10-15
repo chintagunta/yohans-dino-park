@@ -78,6 +78,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = TOOLS.find((x) => x.key === e.key);
       if (t) pickTool(t.id);
+      if (e.key === 'q' || e.key === 'Q') engineRef.current?.triggerQuake();
       if (e.key === 'm' || e.key === 'M') { const m = !audio.isMuted; audio.setMuted(m); setMuted(m); }
       if (e.key === 'l' || e.key === 'L') setLabels((v) => !v);
       if (e.key === 'g' || e.key === 'G') setGuide((v) => !v);
@@ -110,6 +111,20 @@ export default function App() {
           e.setMinimap(miniRef.current);
         }}
       />
+
+      {/* ----- phone: just a music button ----- */}
+      <button
+        className={`music-fab ${muted || !music ? 'off' : ''}`}
+        aria-label="Toggle music"
+        onClick={() => {
+          audio.resume();
+          const on = muted || !music;
+          if (on) { audio.setMuted(false); setMuted(false); }
+          audio.setMusic(on); setMusic(on);
+        }}
+      >
+        {muted || !music ? '🔇' : '🎵'}
+      </button>
 
       {/* ----- top bar ----- */}
       <header className="topbar">
