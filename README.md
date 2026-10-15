@@ -1,18 +1,23 @@
 # Dino Park 2D — Age of Dinosaurs
 
-A 2D prehistoric park built with React + TypeScript + Canvas, inspired by the "Age of Dinosaurs" poster.
+An **infinite**, procedurally generated 2D prehistoric park (React + TypeScript + Canvas 2D + Web Audio).
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev
 npm run build
 ```
 
-## How to play
-- **Drag** the park (or use `←/→`, `A/D`, mouse wheel, the era tabs, or the minimap) to explore Fern Valley (Triassic), Volcano Valley (Jurassic) and Blossom Meadows (Cretaceous).
-- **Tools** (`1`–`4`): Explore (tap for info), Pet (press & hold), Grass, Meat (tap the ground to drop food).
-  Herbivores eat grass, carnivores eat meat, omnivores eat both — feed the wrong thing and they refuse!
-- Dinosaurs graze, wander, sleep, swim in lakes and rivers, and pterosaurs soar and land.
-- The **In view** panel and discovery pop-ups tell you about every species that appears on screen; `G` opens the Field Guide, `L` toggles name tags.
+## World
+- Walk forever in either direction: the world is generated in chunks from hashes (`src/game/world.ts`). Regions cycle through
+  Triassic fern valleys, Jurassic volcano valleys (erupting volcanoes, lava streams) and Cretaceous blossom meadows, each with random
+  lakes, rivers, rocks and plants. Animals spawn as you arrive and despawn as you leave; every herd gets random colour variants.
+- 39 species (33 from the poster + Coelophysis, Brachiosaurus, Triceratops, Parasaurolophus, Spinosaurus, Gallimimus) drawn procedurally.
 
-All 33 species are drawn procedurally (no image assets): see `src/game/draw/dino.ts`, species data in `src/game/species.ts`.
+## Controls
+- Drag / `←→` / `A D` / wheel / minimap / era tabs to travel. Tools `1`–`4`: Explore, Pet, Grass, Meat. `G` field guide, `L` names always on
+  (otherwise names show on hover), `M` mute.
+
+## Sound
+All audio is synthesised (no files): an original adventure-style orchestral theme, wind, birds, insects, water, volcano rumble and eruption
+booms, footsteps scaled by animal size, roars, calls, munching and purring. Sound starts after your first click (browser rule).

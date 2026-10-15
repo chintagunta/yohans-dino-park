@@ -126,3 +126,10 @@ export function hueShift(hex: string, deg: number, light = 0): string {
   const to = (v: number) => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0');
   return `#${to(f(h + 120))}${to(f(h))}${to(f(h - 120))}`;
 }
+
+export function mixHex(a: string, b: string, t: number): string {
+  const [r1, g1, b1] = parse(a);
+  const [r2, g2, b2] = parse(b);
+  const h = (v: number) => Math.round(v).toString(16).padStart(2, '0');
+  return `#${h(lerp(r1, r2, t))}${h(lerp(g1, g2, t))}${h(lerp(b1, b2, t))}`;
+}

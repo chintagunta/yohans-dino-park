@@ -3,7 +3,7 @@ import {
 } from '../world';
 import type { Era } from '../types';
 import { drawFrondFan } from './flora';
-import { clamp, ellipse, lerp, mix, mulberry32, smoothstep } from './util';
+import { clamp, ellipse, lerp, mix, mixHex, mulberry32, smoothstep } from './util';
 
 type C = CanvasRenderingContext2D;
 
@@ -72,11 +72,11 @@ export function buildChunkGround(ci: number): HTMLCanvasElement {
     const wx = x0 + lx + STEP / 2;
     const t = tintAt(wx);
     ctx.fillStyle = `rgba(${t[0] | 0},${t[1] | 0},${t[2] | 0},${t[3].toFixed(3)})`;
-    ctx.fillRect(lx, 0, STEP + 1, h);
+    ctx.fillRect(lx, 0, STEP, h);
     const a = ashAt(wx);
     if (a > 0.02) {
       ctx.fillStyle = `rgba(62,46,42,${(a * 0.8).toFixed(3)})`;
-      ctx.fillRect(lx, 0, STEP + 1, h * (0.75 + 0.25 * a));
+      ctx.fillRect(lx, 0, STEP, h * (0.75 + 0.25 * a));
     }
   }
 
@@ -300,9 +300,9 @@ export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number) {
   const era = regionInfo(regionOf(cx)).era;
   const warm = era === 'triassic' ? 0.25 : 0;
   const sky = ctx.createLinearGradient(0, 0, 0, HORIZON + 10);
-  sky.addColorStop(0, mix(mix('#3fa9e6', '#4aa0e0', warm), '#7a7ea8', vol * 0.8));
-  sky.addColorStop(0.55, mix(mix('#8bd7f0', '#a8dcec', warm), '#f0a77f', vol * 0.9));
-  sky.addColorStop(1, mix(mix('#fff3cf', '#ffe9b8', warm), '#ffd9a0', vol));
+  sky.addColorStop(0, mix(mixHex('#3fa9e6', '#4aa0e0', warm), '#7a7ea8', vol * 0.8));
+  sky.addColorStop(0.55, mix(mixHex('#8bd7f0', '#a8dcec', warm), '#f0a77f', vol * 0.9));
+  sky.addColorStop(1, mix(mixHex('#fff3cf', '#ffe9b8', warm), '#ffd9a0', vol));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, viewW, HORIZON + 14);
 
