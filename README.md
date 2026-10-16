@@ -31,3 +31,13 @@ booms, footsteps scaled by animal size, roars, calls, munching and purring. Soun
 - **Background herds** of running dinosaurs (sometimes chased by raiders) and bird flocks cross the scenery.
 - **Music** is `public/theme.mp3` (looped). Replace that file to change the track.
 - **Phones**: only a music button is shown; drag to look around.
+
+## Update: seasons, weather and liquids
+
+- **Seasons** cycle every 90 s (spring, summer, autumn, winter) with a colour tint, falling petals or leaves, and winter snow that settles on the ground (not near volcanoes). Click the season pill or press **S** to skip ahead.
+- **Weather**: rain showers (with thunder and lightning) come every minute or so, and snowstorms in winter.
+- **Water bodies** vary in size, shape (ponds, lakes, winding lagoons, twin ponds, rivers) and colour, and hold fish that swim around and sometimes leap.
+- **Lava** comes as streams, pools, lakes, scattered pools and calderas, with bubbles that swell and pop.
+- T-Rex (Tyrannosaurus) shows up more often.
+- **Season picker**: the season button opens a menu to choose any season, with an "automatic change" switch. On phones the top options (eras, Field Guide, Names, Season, Sound) shrink to icons.
+- **Night mode**: the moon button (or **N**) switches between day, a full-moon night, and an automatic day and night cycle. Nights have stars, a full moon, fireflies, glowing lava, crickets, and more sleeping dinosaurs.

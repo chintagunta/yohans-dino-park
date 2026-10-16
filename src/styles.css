@@ -128,16 +128,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sound-pop .vol { justify-content: space-between; }
 .sound-pop input[type='range'] { width: 100px; accent-color: var(--navy); }
 
+.season-opt { border: 2px solid transparent; background: #fff9e8; border-radius: 10px; padding: 4px 10px; font-weight: 800; font-size: 14px; text-align: left; }
+.season-opt:hover { background: #fff; }
+.season-opt.on { border-color: var(--navy); background: #e3f2ff; }
+.ico { display: none; }
+.pill-btn .ico, .era-tab .ico { display: inline; }
+.era-tab .ico { display: none; }
+
 /* ------------------------------------------------------------------ phones
-   On a phone the canvas gets the whole screen: only the music button remains. */
-.music-fab { display: none; }
+   Small screens: the canvas gets the screen; the top options shrink to icons
+   and the tray, dock, info card and minimap are hidden. */
 @media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
-  .topbar, .tray, .info-card, .found, .dock-wrap, .minimap, .help { display: none !important; }
-  .music-fab {
-    display: grid; place-items: center; position: absolute; top: 10px; right: 10px; z-index: 6;
-    width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; background: rgba(14, 59, 85, 0.82);
-    color: #fff; font-size: 22px; line-height: 1; box-shadow: var(--shadow); padding: 0; cursor: pointer;
-  }
-  .music-fab.off { background: rgba(80, 80, 80, 0.7); }
-  .toast { top: 12px; bottom: auto; left: 12px; right: 68px; transform: none; font-size: 14px; text-align: left; }
+  .tray, .info-card, .found, .minimap, .help, .zone-pill, .poster-title, .dock-hint, .counters, .tool-label, .tool kbd { display: none !important; }
+  .dock-wrap { left: 50%; right: auto; transform: translateX(-50%); bottom: 10px; }
+  .dock { gap: 8px; padding: 6px 8px; }
+  .tool { width: 54px; height: 54px; padding: 0; display: grid; place-items: center; }
+  .tool-icon { font-size: 28px; }
+  .topbar { padding: 8px; gap: 6px; align-items: center; }
+  .top-actions { flex-wrap: nowrap; gap: 6px; }
+  .lbl { display: none; }
+  .era-tab .ico { display: inline; font-size: 14px; }
+  .era-tab { padding: 6px 11px; font-size: 14px; }
+  .pill-btn { width: 42px; height: 42px; padding: 0; display: grid; place-items: center; font-size: 20px; position: relative; }
+  .pill-btn b { position: absolute; top: -4px; right: -4px; margin: 0; padding: 0 5px; font-size: 10px; }
+  .sound-pop { right: 0; min-width: 170px; }
+  .toast { top: 62px; bottom: auto; left: 12px; right: 12px; transform: none; font-size: 14px; text-align: center; }
 }

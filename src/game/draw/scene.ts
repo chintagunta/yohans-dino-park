@@ -1,5 +1,5 @@
 import {
-  CHUNK, HORIZON, REGION_W, WORLD_H, Blob, getChunk, chunkOf, hash01, regionInfo, regionOf, volcanoNear, rngFor,
+  CHUNK, HORIZON, REGION_W, WORLD_H, Blob, Liquid, getChunk, chunkOf, hash01, regionInfo, regionOf, volcanoNear, rngFor,
 } from '../world';
 import type { Era } from '../types';
 import { drawFrondFan } from './flora';
@@ -132,8 +132,9 @@ export function buildChunkGround(ci: number): HTMLCanvasElement {
       ellipse(ctx, b.x, b.y, b.rx, b.ry);
       const g = ctx.createLinearGradient(0, b.y - b.ry, 0, b.y + b.ry);
       if (water) {
-        g.addColorStop(0, '#4fd0d8');
-        g.addColorStop(1, '#1f8ec2');
+        const tn = WATER_TONES[l.tone % WATER_TONES.length];
+        g.addColorStop(0, tn[0]);
+        g.addColorStop(1, tn[1]);
       } else {
         g.addColorStop(0, '#ff9a1f');
         g.addColorStop(1, '#e3380f');
@@ -293,7 +294,7 @@ function volcano(ctx: C, cx: number, w: number, h: number, t: number, seed: numb
   }
 }
 
-export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number) {
+export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number, night = 0) {
   const cx = camX + viewW / 2;
   const vn = volcanoNear(cx);
   const vol = vn ? Math.exp(-Math.pow((cx - vn.vx) / 900, 2)) : 0;
@@ -306,7 +307,62 @@ export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number) {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, viewW, HORIZON + 14);
 
+  if (night > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = night;
+    const ns = ctx.createLinearGradient(0, 0, 0, HORIZON + 10);
+    ns.addColorStop(0, '#040a22');
+    ns.addColorStop(0.6, '#142a5e');
+    ns.addColorStop(1, '#3b4a86');
+    ctx.fillStyle = ns;
+    ctx.fillRect(0, 0, viewW, HORIZON + 14);
+    // stars
+    const SC = 70;
+    const sf = 0.03;
+    for (let k = Math.floor((camX * sf - 20) / SC); k <= Math.floor((camX * sf + viewW + 20) / SC); k++) {
+      for (let j = 0; j < 3; j++) {
+        const x = k * SC + hash01(k, 100 + j) * SC - camX * sf;
+        const y = hash01(k, 110 + j) * (HORIZON - 40);
+        const tw = 0.55 + 0.45 * Math.sin(t * (1 + hash01(k, 120 + j) * 2) + k + j);
+        ctx.globalAlpha = night * Math.min(1, tw * 1.3) * (0.6 + 0.4 * (1 - y / HORIZON));
+        ctx.fillStyle = hash01(k, 130 + j) > 0.8 ? '#ffe6b0' : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, 1.1 + hash01(k, 140 + j) * 1.6, 0, 6.28);
+        ctx.fill();
+      }
+    }
+    // full moon
+    ctx.globalAlpha = night;
+    const mx = viewW * 0.87, my = 92, mr = 46;
+    const mg = ctx.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 5);
+    mg.addColorStop(0, 'rgba(210,225,255,0.55)');
+    mg.addColorStop(0.25, 'rgba(170,195,255,0.22)');
+    mg.addColorStop(1, 'rgba(150,180,255,0)');
+    ctx.fillStyle = mg;
+    ctx.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+    const md = ctx.createRadialGradient(mx - 12, my - 12, 4, mx, my, mr);
+    md.addColorStop(0, '#fffdf0');
+    md.addColorStop(0.7, '#f1ecd2');
+    md.addColorStop(1, '#d9d3b4');
+    ctx.beginPath();
+    ctx.arc(mx, my, mr, 0, 6.28);
+    ctx.fillStyle = md;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    for (const [dx, dy, r] of [[-14, -10, 11], [12, -18, 7], [14, 10, 13], [-18, 16, 8], [0, 2, 5], [-4, -26, 5]]) {
+      ctx.beginPath();
+      ctx.arc(mx + dx, my + dy, r, 0, 6.28);
+      ctx.fillStyle = 'rgba(160,155,130,0.35)';
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+
   const sx = viewW * 0.78;
+  ctx.save();
+  ctx.globalAlpha = 1 - night;
   const sg = ctx.createRadialGradient(sx, 92, 8, sx, 92, 190);
   sg.addColorStop(0, 'rgba(255,248,200,0.95)');
   sg.addColorStop(0.2, 'rgba(255,236,150,0.5)');
@@ -317,6 +373,7 @@ export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number) {
   ctx.arc(sx, 92, 40, 0, 6.28);
   ctx.fillStyle = '#fff7c9';
   ctx.fill();
+  ctx.restore();
 
   // clouds: three parallax layers, cells hashed so the sky never runs out
   for (let layer = 0; layer < 3; layer++) {
@@ -368,11 +425,159 @@ export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number) {
   ridge(ctx, 0.8, camX, viewW, HORIZON + 10, 38, hillTint[1], 11.3);
 }
 
+const WATER_TONES = [
+  ['#4fd0d8', '#1f8ec2'],
+  ['#5ab6f0', '#1d5fb0'],
+  ['#74dcb0', '#2a9a8a'],
+  ['#86cfc0', '#3a8a82'],
+];
+const FISH_COLS = [
+  ['#ff9a3c', '#ffd27a'], ['#7fb8ff', '#e8f4ff'], ['#ffd23f', '#fff3b0'],
+  ['#ff6a6a', '#ffc0b0'], ['#8ae0a0', '#e0ffe0'], ['#c79bff', '#f0e0ff'],
+];
+
+function drawFish(ctx: C, x: number, y: number, dir: number, size: number, t: number, ph: number, cols: string[], alpha: number, tilt = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt * dir);
+  ctx.scale(dir * size, size);
+  ctx.globalAlpha = alpha;
+  const wag = Math.sin(t * 9 + ph) * 0.22;
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(-0.38, 0);
+  ctx.lineTo(-0.9, -0.3 + wag);
+  ctx.quadraticCurveTo(-0.72, wag * 0.5, -0.9, 0.3 + wag);
+  ctx.closePath();
+  ctx.fillStyle = cols[0];
+  ctx.fill();
+  // dorsal fin
+  ctx.beginPath();
+  ctx.moveTo(-0.1, -0.2);
+  ctx.quadraticCurveTo(0.05, -0.5, 0.25, -0.22);
+  ctx.closePath();
+  ctx.fill();
+  // body
+  const g = ctx.createLinearGradient(0, -0.28, 0, 0.28);
+  g.addColorStop(0, cols[0]);
+  g.addColorStop(0.55, cols[0]);
+  g.addColorStop(0.7, cols[1]);
+  g.addColorStop(1, cols[1]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.52, 0.27, 0, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.lineWidth = 0.06;
+  ctx.strokeStyle = 'rgba(20,50,70,0.55)';
+  ctx.stroke();
+  // eye
+  ctx.beginPath();
+  ctx.arc(0.3, -0.05, 0.075, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0.32, -0.05, 0.038, 0, Math.PI * 2);
+  ctx.fillStyle = '#10222e';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFishAndBubbles(ctx: C, camX: number, viewW: number, t: number, ci: number, l: Liquid, li: number) {
+  const water = l.kind === 'water';
+  const riverLike = l.blobs.length > 12;
+  l.blobs.forEach((b, i) => {
+    if (b.x + b.rx < camX - 40 || b.x - b.rx > camX + viewW + 40) return;
+    if (water) {
+      if (b.rx < 42) return;
+      if (riverLike && hash01(ci * 131 + li * 17 + i, 301) > 0.18) return;
+      const n = riverLike ? 1 : Math.min(5, Math.max(1, Math.round(b.rx / 55)));
+      for (let k = 0; k < n; k++) {
+        const s0 = ci * 9973 + li * 577 + i * 31 + k * 7;
+        const w1 = 0.18 + hash01(s0, 1) * 0.35;
+        const w2 = 0.12 + hash01(s0, 2) * 0.3;
+        const p1 = hash01(s0, 3) * 6.28, p2 = hash01(s0, 4) * 6.28;
+        const px = Math.sin(t * w1 + p1);
+        const dir = Math.cos(t * w1 + p1) >= 0 ? 1 : -1;
+        const x = b.x + px * b.rx * 0.72;
+        let y = b.y + Math.sin(t * w2 + p2) * b.ry * 0.55;
+        const size = (9 + hash01(s0, 5) * 12) * (0.75 + 0.5 * ((y - 410) / 290));
+        const cols = FISH_COLS[Math.floor(hash01(s0, 6) * FISH_COLS.length)];
+        let tilt = Math.cos(t * w2 + p2) * 0.15;
+        let alpha = 0.82;
+        // now and then a fish leaps out of the water
+        const period = 13 + hash01(s0, 7) * 8;
+        const u = ((t + hash01(s0, 8) * period) % period) / period;
+        if (b.rx > 80 && u < 0.045) {
+          const j = u / 0.045;
+          y -= Math.sin(j * Math.PI) * (26 + size);
+          tilt = (0.5 - j) * 1.5;
+          alpha = 1;
+        } else if (b.rx > 80 && u < 0.11) {
+          const f = (u - 0.045) / 0.065;
+          ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - f)})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.ellipse(x, y, 6 + f * 18, 2 + f * 5, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        drawFish(ctx, x, y, dir, size, t, p1, cols, alpha, tilt);
+      }
+    } else {
+      // bubbling lava
+      if (b.rx < 26) return;
+      if (riverLike && hash01(ci * 131 + li * 17 + i, 311) > 0.3) return;
+      const nb = Math.min(7, Math.max(1, Math.round(b.rx / 30)));
+      for (let j = 0; j < nb; j++) {
+        const s0 = ci * 7919 + li * 311 + i * 13 + j * 3;
+        const P = 1.7 + hash01(s0, 1) * 2.4;
+        const tt = t + hash01(s0, 2) * P;
+        const cyc = Math.floor(tt / P);
+        const f = (tt / P) % 1;
+        const ang = hash01(s0 + cyc * 101, 3) * 6.283;
+        const rad = Math.sqrt(hash01(s0 + cyc * 101, 4)) * 0.74;
+        const bx = b.x + Math.cos(ang) * rad * b.rx;
+        const by = b.y + Math.sin(ang) * rad * b.ry;
+        const maxR = 4 + hash01(s0, 5) * 7 + b.rx * 0.015;
+        if (f < 0.78) {
+          const r = maxR * Math.pow(f / 0.78, 0.6);
+          const rise = Math.sin((f / 0.78) * Math.PI * 0.5) * 2;
+          ctx.beginPath();
+          ctx.ellipse(bx, by - rise, r, r * 0.8, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,170,40,0.85)';
+          ctx.fill();
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = 'rgba(255,240,150,0.95)';
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(bx - r * 0.3, by - rise - r * 0.3, r * 0.22, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,230,0.85)';
+          ctx.fill();
+        } else {
+          const q = (f - 0.78) / 0.22;
+          ctx.strokeStyle = `rgba(255,220,110,${0.9 * (1 - q)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(bx, by, maxR * (1 + q * 1.4), maxR * (1 + q * 1.4) * 0.45, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = `rgba(255,200,70,${1 - q})`;
+          for (let s = 0; s < 4; s++) {
+            const a = s * 1.57 + hash01(s0, 9) * 3;
+            ctx.beginPath();
+            ctx.arc(bx + Math.cos(a) * maxR * q * 2.2, by - Math.sin(q * Math.PI) * maxR * 2.2 + Math.sin(a) * 2, 1.7, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+  });
+}
+
 export function drawLiquidFx(ctx: C, camX: number, viewW: number, t: number) {
   ctx.save();
   ctx.translate(-camX, 0);
   for (let ci = chunkOf(camX); ci <= chunkOf(camX + viewW); ci++) {
-    for (const l of getChunk(ci).liquids) {
+    getChunk(ci).liquids.forEach((l, li) => {
+      drawFishAndBubbles(ctx, camX, viewW, t, ci, l, li);
       const water = l.kind === 'water';
       l.blobs.forEach((b, i) => {
         if (b.x + b.rx < camX || b.x - b.rx > camX + viewW) return;
@@ -405,7 +610,7 @@ export function drawLiquidFx(ctx: C, camX: number, viewW: number, t: number) {
           ctx.fill();
         }
       });
-    }
+    });
   }
   ctx.restore();
 }

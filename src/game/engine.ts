@@ -1,5 +1,8 @@
 import { SPECIES, ERAS, variantOf } from './species';
 import { audio } from './audio';
+import { Weather } from './weather';
+import { DayNight } from './daynight';
+import type { TimeMode } from './daynight';
 import type { DinoState, Era, Food, Pose, Species, Tool } from './types';
 import { drawDino, makePose } from './draw/dino';
 import { drawDecor } from './draw/flora';
@@ -34,6 +37,7 @@ export interface Callbacks {
   onStats: (s: Stats) => void;
   onZone: (era: Era, name: string) => void;
   onToast: (msg: string) => void;
+  onSeason?: (label: string, index: number) => void;
 }
 
 interface Bubble { text: string; t: number }
@@ -98,6 +102,9 @@ export class Engine {
   private populated = new Set<number>();
   private pending: { id: string; until: number } | null = null;
   private popT = 0;
+  private weather = new Weather();
+  private dn = new DayNight();
+  private seasonLabel = '';
   private herds: Herd[] = [];
   private herdT = 2;
   private quake = { t: 0, dur: 0, mag: 0 };
@@ -221,6 +228,10 @@ export class Engine {
     this.emitSelected();
   }
   deselect() { this.select(null); }
+  setTimeMode(m: TimeMode) { this.dn.setMode(m); }
+  nextSeason() { this.weather.next(); }
+  setSeason(i: number) { this.weather.set(i); }
+  setAutoSeason(on: boolean) { this.weather.auto = on; }
   triggerQuake() { this.startQuake(0.6 + this.rnd() * 0.4); }
 
   getInfo(): DinoInfo | null {
@@ -272,7 +283,7 @@ export class Engine {
         }
       }
       else {
-        const w = land.map((s) => (s.era === ch.era ? 3 : 0.7) * (s.flies ? 1.1 : 1) * (ch.volcano && s.era === 'jurassic' ? 1.3 : 1));
+        const w = land.map((s) => (s.era === ch.era ? 3 : 0.7) * (s.flies ? 1.1 : 1) * (s.id === 'tyrannosaurus' ? 2.2 : 1) * (ch.volcano && s.era === 'jurassic' ? 1.3 : 1));
         let r = rnd() * w.reduce((a, b) => a + b, 0);
         sp = land[0];
         for (let i = 0; i < land.length; i++) {
@@ -325,6 +336,11 @@ export class Engine {
     this.updateAudio(dt);
     this.updateHerds(dt);
     this.updateQuake(dt);
+    this.weather.update(dt, this.viewW);
+    this.dn.update(dt);
+    if (this.weather.thunder) { this.weather.thunder = false; audio.thunder(); }
+    const lab = this.weather.label;
+    if (lab !== this.seasonLabel) { this.seasonLabel = lab; this.cb.onSeason?.(lab, this.weather.season); }
     this.popT -= dt;
     if (this.popT <= 0) {
       this.popT = 0.5;
@@ -405,6 +421,8 @@ export class Engine {
     const volc = vn ? clamp(1 - Math.abs(vn.vx - c) / 1500, 0, 1) : 0;
     const zi = ERA_ORDER.indexOf(zoneAt(c).era);
     audio.update(c, this.time, water, lava, volc, zi, vn ? vn.vseed : 0);
+    audio.setWeather(this.weather.rain, this.weather.snow);
+    audio.setNight(this.dn.night);
   }
 
   private updateDino(d: Dino, dt: number) {
@@ -698,7 +716,7 @@ export class Engine {
       else this.enter(d, 'idle', 2 + rnd() * 4);
       return;
     }
-    if (d.hunger < 0.6 && r < 0.12) { this.enter(d, 'sleep', 14 + rnd() * 14); return; }
+    if (d.hunger < 0.6 && r < 0.12 + this.dn.night * 0.35) { this.enter(d, 'sleep', 14 + rnd() * 14); return; }
     if (sp.swims && r < 0.3) {
       const w = randomWaterPoint(rnd, d.home.x);
       if (w && Math.abs(w.x - d.x) < 800) { d.tx = w.x; d.ty = w.y; this.enter(d, 'swim', 16); return; }
@@ -1104,10 +1122,17 @@ export class Engine {
       ctx.scale(1.025, 1.025);
       ctx.translate(-this.viewW / 2 + (Math.random() - 0.5) * 2 * amp, -WORLD_H / 2 + (Math.random() - 0.5) * 2 * amp);
     }
-    drawBackdrop(ctx, this.camX, this.viewW, t);
+    drawBackdrop(ctx, this.camX, this.viewW, t, this.dn.night);
     this.drawHerds(true);
     ensureGround(this.camX, this.camX + this.viewW);
     drawGround(ctx, this.camX, this.viewW);
+    if (this.weather.snowCover > 0.02) {
+      const cx = this.camX + this.viewW / 2;
+      const vn = volcanoNear(cx);
+      const far = vn ? clamp((Math.abs(vn.vx - cx) - 500) / 1500, 0, 1) : 1;
+      const holes = liquidsIn(this.camX - 100, this.camX + this.viewW + 100).flatMap((l) => l.blobs);
+      this.weather.drawSnowCover(ctx, this.canvas.width, this.canvas.height, this.dpr * this.zoom, this.camX, this.viewW, this.weather.snowCover * far, holes);
+    }
     drawLiquidFx(ctx, this.camX, this.viewW, t);
     this.drawHerds(false);
 
@@ -1141,6 +1166,11 @@ export class Engine {
     ctx.restore();
 
     drawForeground(ctx, this.camX, this.viewW, t);
+    if (this.dn.night > 0.01) {
+      const lava = liquidsIn(this.camX - 200, this.camX + this.viewW + 200).filter((l) => l.kind === 'lava').flatMap((l) => l.blobs);
+      this.dn.draw(ctx, this.viewW, t, this.camX, lava);
+    }
+    this.weather.drawOverlay(ctx, this.viewW);
 
     if (env > 0) {
       ctx.setTransform(this.dpr * this.zoom, 0, 0, this.dpr * this.zoom, 0, 0);

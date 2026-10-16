@@ -41,6 +41,9 @@ export class GameAudio {
   private waterG!: GainNode;
   private lavaG!: GainNode;
   private bugG!: GainNode;
+  private night = 0;
+  private rainG!: GainNode;
+  private snowG!: GainNode;
   private timer = 0;
   private theme: HTMLAudioElement | null = null;
   private nextBeat = 0;
@@ -214,6 +217,16 @@ export class GameAudio {
     const blg = ctx.createGain(); blg.gain.value = 0.012;
     bl.connect(blg).connect(this.bugG.gain); bl.start();
     bug.connect(bbp).connect(this.bugG).connect(this.ambBus);
+    // rain (hiss) and a soft snowy wind
+    const rn = this.noiseSrc(this.noiseW);
+    const rhp = ctx.createBiquadFilter(); rhp.type = 'highpass'; rhp.frequency.value = 1800;
+    const rlp = ctx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 7500;
+    this.rainG = ctx.createGain(); this.rainG.gain.value = 0;
+    rn.connect(rhp).connect(rlp).connect(this.rainG).connect(this.ambBus);
+    const sn = this.noiseSrc(this.noiseW);
+    const sbp = ctx.createBiquadFilter(); sbp.type = 'bandpass'; sbp.frequency.value = 700; sbp.Q.value = 0.4;
+    this.snowG = ctx.createGain(); this.snowG.gain.value = 0;
+    sn.connect(sbp).connect(this.snowG).connect(this.ambBus);
   }
 
   /* ----------------------------------------------------------- music score */
@@ -482,6 +495,25 @@ export class GameAudio {
     }
   }
 
+  setNight(n: number) { this.night = n; }
+
+  /** Rain / snowfall loudness (0..1). */
+  setWeather(rain: number, snow: number) {
+    if (!this.ctx || !this.rainG) return;
+    const t = this.ctx.currentTime;
+    this.rainG.gain.setTargetAtTime(0.2 * rain, t, 0.6);
+    this.snowG.gain.setTargetAtTime(0.05 * snow, t, 0.8);
+  }
+
+  thunder() {
+    if (!this.ready()) return;
+    const t = this.ctx!.currentTime + 0.35 + Math.random() * 0.8;
+    this.burst(t, 0.15, 3000, 0.25, this.sfxBus, 'highpass');
+    this.burst(t + 0.05, 3.4, 260, 0.9, this.sfxBus, 'lowpass', 0.6, 0, this.noiseB);
+    this.burst(t + 0.5, 2.6, 160, 0.6, this.sfxBus, 'lowpass', 0.6, 0, this.noiseB);
+    this.tone(t, 70, 32, 2.6, 0.35, 'sine');
+  }
+
   /* ------------------------------------------------------- per-frame update */
 
   /** camX centre, current zone data & engine time. nearWater/nearLava in 0..1. */
@@ -492,7 +524,7 @@ export class GameAudio {
     this.waterG.gain.setTargetAtTime(0.16 * nearWater, t, 0.5);
     this.lavaG.gain.setTargetAtTime(0.55 * Math.max(nearLava * 0.6, volcanoDist), t, 0.6);
     this.windG.gain.setTargetAtTime(zoneIdx === 1 ? 0.075 : 0.045, t, 1);
-    this.bugG.gain.setTargetAtTime(zoneIdx === 1 ? 0.005 : 0.03, t, 1.5);
+    this.bugG.gain.setTargetAtTime((zoneIdx === 1 ? 0.005 : 0.03) + 0.045 * this.night, t, 1.5);
 
     // eruption sync (matches the volcano drawn in scene.ts: seed 0.2, cycle 15 s)
     const cyc = (time + volcSeed * 3) % 15;
@@ -510,7 +542,7 @@ export class GameAudio {
     void camCenter;
 
     // random birds
-    if (time > this.birdT) {
+    if (time > this.birdT && this.night < 0.6) {
       this.birdT = time + rand(1.2, zoneIdx === 1 ? 7 : 3.8);
       this.bird(zoneIdx);
     }

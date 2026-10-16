@@ -20,6 +20,7 @@ export function Park({ callbacks, onEngine }: Props) {
       onStats: (s) => cbRef.current.onStats(s),
       onZone: (e, n) => cbRef.current.onZone(e, n),
       onToast: (m) => cbRef.current.onToast(m),
+      onSeason: (l, i) => cbRef.current.onSeason?.(l, i),
     });
     onEngine(engine);
     engine.start();

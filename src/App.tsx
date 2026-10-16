@@ -6,6 +6,7 @@ import { Portrait } from './components/Portrait';
 import type { Callbacks, DinoInfo, Engine, Stats, ViewItem } from './game/engine';
 import { ERAS, SPECIES, SPECIES_BY_ID } from './game/species';
 import { audio } from './game/audio';
+import { SEASONS } from './game/weather';
 import type { Era, Species, Tool } from './game/types';
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string; hint: string }[] = [
@@ -30,6 +31,11 @@ export default function App() {
   const [stats, setStats] = useState<Stats>({ fed: 0, pets: 0, discovered: 0, total: SPECIES.length });
   const [zone, setZone] = useState<{ era: Era; name: string }>({ era: 'triassic', name: 'Fern Valley' });
   const [toast, setToast] = useState<string | null>(null);
+  const [season, setSeason] = useState(0);
+  const [seasonAuto, setSeasonAuto] = useState(true);
+  const [seasonOpen, setSeasonOpen] = useState(false);
+  const [tod, setTod] = useState<'day' | 'night' | 'auto'>('auto');
+  const [todOpen, setTodOpen] = useState(false);
   const [found, setFound] = useState<Species | null>(null);
   const [guide, setGuide] = useState(false);
   const [discovered, setDiscovered] = useState<Set<string>>(new Set());
@@ -49,6 +55,7 @@ export default function App() {
     onStats: setStats,
     onZone: (era, name) => setZone({ era, name }),
     onToast: flash,
+    onSeason: (_l, i) => setSeason(i),
     onDiscover: (sp) => {
       setDiscovered((s) => new Set(s).add(sp.id));
       setFound(sp);
@@ -78,6 +85,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = TOOLS.find((x) => x.key === e.key);
       if (t) pickTool(t.id);
+      if (e.key === 'n' || e.key === 'N') setTod((v) => { const nx = v === 'day' ? 'night' : v === 'night' ? 'auto' : 'day'; engineRef.current?.setTimeMode(nx); return nx; });
+      if (e.key === 's' || e.key === 'S') engineRef.current?.nextSeason();
       if (e.key === 'q' || e.key === 'Q') engineRef.current?.triggerQuake();
       if (e.key === 'm' || e.key === 'M') { const m = !audio.isMuted; audio.setMuted(m); setMuted(m); }
       if (e.key === 'l' || e.key === 'L') setLabels((v) => !v);
@@ -112,20 +121,6 @@ export default function App() {
         }}
       />
 
-      {/* ----- phone: just a music button ----- */}
-      <button
-        className={`music-fab ${muted || !music ? 'off' : ''}`}
-        aria-label="Toggle music"
-        onClick={() => {
-          audio.resume();
-          const on = muted || !music;
-          if (on) { audio.setMuted(false); setMuted(false); }
-          audio.setMusic(on); setMusic(on);
-        }}
-      >
-        {muted || !music ? '🔇' : '🎵'}
-      </button>
-
       {/* ----- top bar ----- */}
       <header className="topbar">
         <div className="title-wrap">
@@ -138,17 +133,42 @@ export default function App() {
                 style={{ ['--c' as string]: ERAS[era].color, ['--ink' as string]: ERAS[era].ink }}
                 onClick={() => engineRef.current?.jumpZone(era)}
               >
-                {ERAS[era].short}
+                <span className="lbl">{ERAS[era].short}</span><span className="ico">{ERAS[era].short[0]}</span>
               </button>
             ))}
           </nav>
         </div>
         <div className="top-actions">
           <div className="zone-pill">📍 {zone.name}</div>
-          <button className="pill-btn" onClick={() => setGuide(true)}>📖 Field Guide <b>{stats.discovered}/{stats.total}</b></button>
-          <button className={`pill-btn ${labels ? 'on' : ''}`} onClick={() => setLabels((v) => !v)} title="Show every name (otherwise names appear on hover)">🏷 Names: {labels ? 'always' : 'on hover'}</button>
+          <button className="pill-btn" onClick={() => setGuide(true)} title="Field Guide (G)"><span className="ico">📖</span><span className="lbl"> Field Guide</span> <b>{stats.discovered}/{stats.total}</b></button>
+          <button className={`pill-btn ${labels ? 'on' : ''}`} onClick={() => setLabels((v) => !v)} title="Show every name (otherwise names appear on hover)"><span className="ico">🏷</span><span className="lbl"> Names: {labels ? 'always' : 'on hover'}</span></button>
           <div className="sound-wrap">
-            <button className={`pill-btn ${muted ? '' : 'on'}`} onClick={() => { audio.resume(); setSoundOpen((v) => !v); }} title="Sound (M to mute)">{muted ? '🔇' : '🔊'} Sound</button>
+            <button className="pill-btn" onClick={() => { setTodOpen((v) => !v); setSeasonOpen(false); setSoundOpen(false); }} title="Time of day (N)"><span className="ico">{tod === 'night' ? '🌙' : tod === 'day' ? '☀️' : '🌗'}</span><span className="lbl"> {tod === 'night' ? 'Night' : tod === 'day' ? 'Day' : 'Day & night'}</span></button>
+            {todOpen && (
+              <div className="sound-pop">
+                {([['day', '☀️ Day'], ['night', '🌙 Full moon night'], ['auto', '🌗 Day & night cycle']] as const).map(([m, label]) => (
+                  <button key={m} className={`season-opt ${tod === m ? 'on' : ''}`} onClick={() => { engineRef.current?.setTimeMode(m); setTod(m); }}>{label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="sound-wrap">
+            <button className="pill-btn" onClick={() => { setSeasonOpen((v) => !v); setSoundOpen(false); setTodOpen(false); }} title="Season"><span className="ico">{SEASONS[season].icon}</span><span className="lbl"> {SEASONS[season].name}</span></button>
+            {seasonOpen && (
+              <div className="sound-pop">
+                {SEASONS.map((s, i) => (
+                  <button key={s.id} className={`season-opt ${season === i ? 'on' : ''}`} onClick={() => { engineRef.current?.setSeason(i); setSeason(i); }}>
+                    {s.icon} {s.name}
+                  </button>
+                ))}
+                <label className="row">
+                  <input type="checkbox" checked={seasonAuto} onChange={(e) => { engineRef.current?.setAutoSeason(e.target.checked); setSeasonAuto(e.target.checked); }} /> Change automatically
+                </label>
+              </div>
+            )}
+          </div>
+          <div className="sound-wrap">
+            <button className={`pill-btn ${muted ? '' : 'on'}`} onClick={() => { audio.resume(); setSoundOpen((v) => !v); setSeasonOpen(false); setTodOpen(false); }} title="Sound (M to mute)"><span className="ico">{muted ? '🔇' : '🔊'}</span><span className="lbl"> Sound</span></button>
             {soundOpen && (
               <div className="sound-pop">
                 <label className="row">

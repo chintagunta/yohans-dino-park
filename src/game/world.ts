@@ -15,7 +15,7 @@ export const GROUND_MIN = 410;
 export const GROUND_MAX = 692;
 
 export interface Blob { x: number; y: number; rx: number; ry: number }
-export interface Liquid { kind: 'water' | 'lava'; name: string; blobs: Blob[] }
+export interface Liquid { kind: 'water' | 'lava'; name: string; blobs: Blob[]; tone: number }
 
 function h32(n: number) {
   n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
@@ -109,40 +109,90 @@ export interface Chunk {
 
 const chunkCache = new Map<number, Chunk>();
 
-const WATER_NAMES = ['Mirror Lake', 'Lily Pond', 'Sunset Lagoon', 'Teal Pool', 'Jurassic River', 'Cypress Creek', 'Silver River'];
+const WATER_NAMES = ['Mirror Lake', 'Lily Pond', 'Sunset Lagoon', 'Teal Pool', 'Jurassic River', 'Cypress Creek', 'Silver River', 'Fish Hollow', 'Reed Marsh'];
+const LAVA_NAMES = ['Lava Lake', 'Magma Pool', 'Ember Basin', 'Fire Pit'];
+
+/** Keep a blob (and its sandy rim) inside its chunk so ground tiles never clip it. */
+function fit(b: Blob, x0: number): Blob {
+  const m = 1.12;
+  const lo = x0 + 24, hi = x0 + CHUNK - 24;
+  const rx = Math.min(b.rx, (hi - lo) / 2 / m - 8);
+  const k = rx / b.rx;
+  return { x: clamp(b.x, lo + rx * m + 8, hi - rx * m - 8), y: b.y, rx, ry: b.ry * k };
+}
+
+/** A chain of overlapping ellipses: ponds, kidney-shaped lakes, long lagoons, … */
+function chain(rnd: () => number, x0: number, cx: number, cy: number, n: number, rMin: number, rMax: number, aspect: number, bend: number): Blob[] {
+  const radii: number[] = [];
+  for (let i = 0; i < n; i++) radii.push(lerp(rMin, rMax, 0.25 + 0.75 * rnd()) * (n > 2 && i > 0 && i < n - 1 ? 1.12 : 1));
+  let total = 0;
+  for (const r of radii) total += r * 1.05;
+  const scale = total > 1000 ? 1000 / total : 1;
+  let x = cx - (total * scale) / 2;
+  const out: Blob[] = [];
+  radii.forEach((r0, i) => {
+    const r = r0 * scale;
+    x += r * (i === 0 ? 1.05 : 0.55);
+    const u = n > 1 ? i / (n - 1) : 0.5;
+    const y = clamp(cy + Math.sin(u * Math.PI) * bend + (rnd() - 0.5) * 14, 505, 640);
+    out.push(fit({ x, y, rx: r, ry: r * aspect * (0.9 + rnd() * 0.3) }, x0));
+    x += r * 0.55;
+  });
+  return out;
+}
+
+function waterBody(rnd: () => number, x0: number): Blob[] {
+  const t = rnd();
+  const cx = x0 + 380 + rnd() * 440;
+  const cy = 535 + rnd() * 60;
+  if (t < 0.26) return chain(rnd, x0, cx, cy, 2, 55, 95, 0.36, 8); // small pond
+  if (t < 0.5) return chain(rnd, x0, cx, cy, 3 + Math.floor(rnd() * 2), 110, 220, 0.3, 24); // lake
+  if (t < 0.72) return chain(rnd, x0, cx, cy - 10, 5 + Math.floor(rnd() * 2), 75, 150, 0.32, (rnd() - 0.5) * 120); // winding lagoon
+  if (t < 0.88) return [...chain(rnd, x0, cx - 270, cy, 2, 55, 110, 0.34, 10), ...chain(rnd, x0, cx + 250, cy + (rnd() - 0.5) * 60, 2, 60, 120, 0.34, 10)]; // twin ponds
+  return chain(rnd, x0, cx, cy, 3, 230, 330, 0.28, 18); // great lake
+}
+
+function lavaBody(rnd: () => number, x0: number, cx: number, big: boolean): Blob[] {
+  const cy = 520 + rnd() * 70;
+  const t = rnd();
+  if (!big) return chain(rnd, x0, cx, cy, 1 + Math.floor(rnd() * 2), 55, 140, 0.34, 6); // pool beside the stream
+  if (t < 0.34) return chain(rnd, x0, cx, cy, 3 + Math.floor(rnd() * 2), 90, 200, 0.32, 20); // lava lake
+  if (t < 0.6) return [...chain(rnd, x0, cx - 300, cy, 1, 50, 85, 0.36, 0), ...chain(rnd, x0, cx, cy + 30, 2, 55, 110, 0.34, 0), ...chain(rnd, x0, cx + 320, cy - 20, 1, 60, 100, 0.35, 0)]; // scattered pools
+  if (t < 0.82) return chain(rnd, x0, cx, cy, 5, 70, 150, 0.33, (rnd() - 0.5) * 100); // winding magma channel
+  return chain(rnd, x0, cx, cy, 3, 200, 270, 0.3, 16); // caldera lake
+}
 
 function makeLiquids(ci: number, era: Era, volcano: boolean): Liquid[] {
   const rnd = rngFor(ci, 11);
   const x0 = ci * CHUNK;
   const first = mod(ci, REGION_CHUNKS) === 0;
   const out: Liquid[] = [];
-  if (volcano && first) {
-    const vx = x0 + CHUNK / 2;
-    out.push({ kind: 'lava', name: 'Lava Stream', blobs: [...riverBlobs(vx, HORIZON + 4, 520, 50, rnd() * 6, 14, 70), { x: vx + 100, y: 530, rx: 130, ry: 40 }] });
+  if (volcano) {
+    if (first) {
+      const vx = x0 + CHUNK / 2;
+      const wob = 30 + rnd() * 60;
+      const stream = riverBlobs(vx, HORIZON + 4, 500 + rnd() * 40, wob, rnd() * 6, 12 + rnd() * 8, 50 + rnd() * 40).map((b) => fit(b, x0));
+      out.push({ kind: 'lava', name: 'Lava Stream', tone: 0, blobs: [...stream, ...lavaBody(rnd, x0, vx + (rnd() < 0.5 ? -1 : 1) * (250 + rnd() * 150), false)] });
+      if (rnd() < 0.45) out.push({ kind: 'lava', name: LAVA_NAMES[Math.floor(rnd() * LAVA_NAMES.length)], tone: 0, blobs: lavaBody(rnd, x0, vx + (rnd() < 0.5 ? -1 : 1) * 430, false) });
+    } else if (rnd() < 0.7) {
+      out.push({ kind: 'lava', name: LAVA_NAMES[Math.floor(rnd() * LAVA_NAMES.length)], tone: 0, blobs: lavaBody(rnd, x0, x0 + 400 + rnd() * 400, true) });
+    }
     return out;
   }
   const roll = rnd();
-  const lakeP = era === 'jurassic' ? 0.28 : 0.55;
-  const riverP = era === 'jurassic' ? 0.45 : 0.2;
+  const lakeP = era === 'jurassic' ? 0.3 : 0.58;
+  const riverP = era === 'jurassic' ? 0.45 : 0.22;
   const name = WATER_NAMES[Math.floor(rnd() * WATER_NAMES.length)];
+  const tone = Math.floor(rnd() * 4);
   if (roll < lakeP) {
-    const s = 0.8 + rnd() * 0.35;
-    const cx = x0 + 450 + rnd() * 300;
-    const cy = 548 + rnd() * 36;
-    out.push({
-      kind: 'water', name,
-      blobs: [
-        { x: cx, y: cy, rx: 260 * s, ry: 78 * s },
-        { x: cx + 150 * s, y: cy - 22 * s, rx: 160 * s, ry: 52 * s },
-        { x: cx - 160 * s, y: cy + 18 * s, rx: 140 * s, ry: 50 * s },
-      ],
-    });
+    out.push({ kind: 'water', name, tone, blobs: waterBody(rnd, x0) });
   } else if (roll < lakeP + riverP) {
-    const cx = x0 + 500 + rnd() * 200;
-    out.push({
-      kind: 'water', name,
-      blobs: [...riverBlobs(cx, HORIZON + 6, 606, 110, rnd() * 6, 16, 120, (rnd() - 0.5) * 180), { x: cx - 70, y: 614, rx: 180, ry: 50 }],
-    });
+    const cx = x0 + 520 + rnd() * 160;
+    const wob = 60 + rnd() * 110;
+    const w1 = 70 + rnd() * 70;
+    const blobs = riverBlobs(cx, HORIZON + 6, 606, wob, rnd() * 6, 10 + rnd() * 14, w1, (rnd() - 0.5) * 180).map((b) => fit(b, x0));
+    if (rnd() < 0.75) blobs.push(fit({ x: cx - 70 + (rnd() - 0.5) * 120, y: 612, rx: 120 + rnd() * 110, ry: 40 + rnd() * 24 }, x0));
+    out.push({ kind: 'water', name, tone, blobs });
   }
   return out;
 }
