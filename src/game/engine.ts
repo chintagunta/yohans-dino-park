@@ -6,11 +6,13 @@ import type { TimeMode } from './daynight';
 import type { DinoState, Era, Food, Pose, Species, Tool } from './types';
 import { drawDino, makePose } from './draw/dino';
 import { drawDecor } from './draw/flora';
+import { ARK_START, ARK_RAMP0, ARK_DOOR, ARK_RAMP_H } from './draw/ark';
+import type { ArkSite } from './draw/ark';
 import { drawBackdrop, drawForeground, drawGround, drawLiquidFx, ensureGround } from './draw/scene';
 import { approach, clamp, ellipse, lerp, mulberry32, roundRect } from './draw/util';
 import {
   CHUNK, ERA_ORDER, GROUND_MAX, GROUND_MIN, HORIZON, REGION_W, WORLD_H, blocked, chunkOf, depthScale, getChunk, inWater,
-  liquidAt, liquidsIn, nearestRegionOfEra, pruneChunks, randomWaterPoint, regionInfo, regionOf, volcanoNear, zoneAt,
+  hash01, liquidAt, liquidsIn, nearestRegionOfEra, pruneChunks, randomWaterPoint, regionInfo, regionOf, volcanoNear, zoneAt,
 } from './world';
 
 /* -------------------------------------------------------------------------- */
@@ -1078,6 +1080,63 @@ export class Engine {
     ctx.restore();
   }
 
+  /* -------------------------------------------------- Noah's ark: animals arriving two by two */
+
+  private arkPose = new Map<string, Pose>();
+  private arkPool: Species[] | null = null;
+
+  private drawArkPairs(sites: ArkSite[]) {
+    const ctx = this.ctx;
+    const t = this.time;
+    const pool = (this.arkPool ??= SPECIES.filter((s) => !s.aquatic && !s.flies && s.length >= 0.8 && s.length <= 14));
+    const V = 15; // px/s: a slow, unhurried procession
+    const walk = ARK_START - ARK_RAMP0;
+    const climb = Math.hypot(ARK_RAMP0 - ARK_DOOR, ARK_RAMP_H);
+    const total = walk + climb;
+    const T = total / V + 4;
+    const N = 5;
+    if (this.arkPose.size > 300) this.arkPose.clear();
+    for (const st of sites) {
+      for (let j = 0; j < N; j++) {
+        const u = (t + (j * T) / N + st.k * 37) / T;
+        const cyc = Math.floor(u);
+        const s = (u - cyc) * T * V; // distance travelled along the path
+        if (s > total) continue;
+        const sp = pool[Math.floor(hash01(st.k * 131 + j, cyc + 5) * pool.length) % pool.length];
+        const deg = hash01(st.k + j, cyc + 9) < 0.5 ? 0 : Math.round(30 + hash01(j, cyc + 3) * 120) * (hash01(j, cyc + 1) < 0.5 ? -1 : 1);
+        const look = variantOf(sp, deg, 0);
+        const S = clamp(look.size * 0.16, 17, 42);
+        let dx: number, dy = 0, alpha = 1;
+        if (s <= walk) dx = -st.a * ARK_START + st.a * s;
+        else {
+          const f = (s - walk) / climb;
+          dx = -st.a * ARK_RAMP0 + st.a * f * (ARK_RAMP0 - ARK_DOOR);
+          dy = -f * ARK_RAMP_H;
+          alpha = clamp((1 - f) * 4, 0, 1);
+        }
+        for (let m = 0; m < 2; m++) {
+          const key = `${st.k}:${j}:${cyc}:${m}`;
+          let pose = this.arkPose.get(key);
+          if (!pose) { pose = makePose({ moving: 1, flap: 0, fold: 0, phase: m * 1.7 + hash01(j, cyc) * 6 }); this.arkPose.set(key, pose); }
+          pose.t = t + m * 0.9;
+          pose.phase = t * Math.min(8, V / Math.max(8, S * 0.075)) + m * 1.7;
+          const sc = S * (m ? 0.9 : 1);
+          const x = st.x + dx - st.a * m * (S * 0.62 + 6);
+          const y = st.y + 3 + dy - m * 1.5;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ellipse(ctx, x, y + 1, sc * 0.34, sc * 0.06);
+          ctx.fillStyle = 'rgba(20,40,20,0.25)';
+          ctx.fill();
+          ctx.translate(x, y);
+          ctx.scale(sc * st.a, sc);
+          drawDino(ctx, look, pose, sc);
+          ctx.restore();
+        }
+      }
+    }
+  }
+
   private drawCracks() {
     const env = this.quakeEnv();
     if (env <= 0.02) return;
@@ -1122,7 +1181,7 @@ export class Engine {
       ctx.scale(1.025, 1.025);
       ctx.translate(-this.viewW / 2 + (Math.random() - 0.5) * 2 * amp, -WORLD_H / 2 + (Math.random() - 0.5) * 2 * amp);
     }
-    drawBackdrop(ctx, this.camX, this.viewW, t, this.dn.night);
+    drawBackdrop(ctx, this.camX, this.viewW, t, this.dn.night, (sites) => this.drawArkPairs(sites));
     this.drawHerds(true);
     ensureGround(this.camX, this.camX + this.viewW);
     drawGround(ctx, this.camX, this.viewW);

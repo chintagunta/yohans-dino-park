@@ -76,9 +76,10 @@ export default function App() {
 
   useEffect(() => {
     const wake = () => audio.resume();
-    window.addEventListener('pointerdown', wake);
-    window.addEventListener('keydown', wake);
-    return () => { window.removeEventListener('pointerdown', wake); window.removeEventListener('keydown', wake); };
+    // touchend/click/pointerup count as user activation on phones; pointerdown/touchstart do not
+    const evs = ['pointerup', 'touchend', 'click', 'keydown'] as const;
+    evs.forEach((n) => window.addEventListener(n, wake));
+    return () => evs.forEach((n) => window.removeEventListener(n, wake));
   }, []);
 
   useEffect(() => {

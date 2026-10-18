@@ -72,6 +72,7 @@ export class GameAudio {
   resume() {
     if (!this.ctx) this.init();
     if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
+    this.applyTheme(); // retries play() on every tap until the browser allows it
   }
 
   setMuted(m: boolean) {
@@ -88,9 +89,10 @@ export class GameAudio {
     this.musicOn = on;
     try { localStorage.setItem('dino-music', on ? '1' : '0'); } catch { /* ignore */ }
     if (this.ctx) this.musicBus.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.4);
-    if (this.theme) { if (on) void this.theme.play().catch(() => undefined); else this.theme.pause(); }
+    this.applyTheme();
   }
   private applyMaster() {
+    this.applyTheme();
     if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime, 0.08);
   }
 
@@ -159,11 +161,20 @@ export class GameAudio {
     el.loop = true;
     el.preload = 'auto';
     this.theme = el;
-    try {
-      ctx.createMediaElementSource(el).connect(this.musicBus);
-    } catch { /* fall through to plain element output */ }
+    // Played as a plain element (not routed through Web Audio): phone browsers
+    // only allow that straight from a tap, and iOS silences Web Audio on mute.
+    el.setAttribute('playsinline', '');
     el.addEventListener('error', () => this.startSynth(), { once: true });
-    if (this.musicOn) void el.play().catch(() => this.startSynth());
+    this.applyTheme();
+  }
+
+  private applyTheme() {
+    const el = this.theme;
+    if (!el) return;
+    el.muted = this.muted;
+    el.volume = Math.min(1, this.volume * 0.85);
+    if (this.musicOn && !this.muted) { if (el.paused) void el.play().catch(() => undefined); }
+    else el.pause();
   }
 
   private startSynth() {

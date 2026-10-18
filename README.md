@@ -41,3 +41,6 @@ booms, footsteps scaled by animal size, roars, calls, munching and purring. Soun
 - T-Rex (Tyrannosaurus) shows up more often.
 - **Season picker**: the season button opens a menu to choose any season, with an "automatic change" switch. On phones the top options (eras, Field Guide, Names, Season, Sound) shrink to icons.
 - **Night mode**: the moon button (or **N**) switches between day, a full-moon night, and an automatic day and night cycle. Nights have stars, a full moon, fireflies, glowing lava, crickets, and more sleeping dinosaurs.
+
+- **Noah's ark**: a far-background plateau (parallax 0.58) with an ark about 75% built (finished hull and roof, bare ribs and rafters, scaffolding, builders, a derrick, log piles, a campfire). Pairs of animals walk slowly to its ramp and board. It recurs every few thousand pixels, and the first one is near the start.
+- **Phone music**: audio is now unlocked on touchend/pointerup/click, and the MP3 plays as a plain media element (so iOS/Android autoplay rules and the iOS silent switch no longer block it).

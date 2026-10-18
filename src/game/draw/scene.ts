@@ -3,6 +3,8 @@ import {
 } from '../world';
 import type { Era } from '../types';
 import { drawFrondFan } from './flora';
+import { drawArkLayer } from './ark';
+import type { ArkSite } from './ark';
 import { clamp, ellipse, lerp, mix, mixHex, mulberry32, smoothstep } from './util';
 
 type C = CanvasRenderingContext2D;
@@ -294,7 +296,7 @@ function volcano(ctx: C, cx: number, w: number, h: number, t: number, seed: numb
   }
 }
 
-export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number, night = 0) {
+export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number, night = 0, arkPairs?: (sites: ArkSite[]) => void) {
   const cx = camX + viewW / 2;
   const vn = volcanoNear(cx);
   const vol = vn ? Math.exp(-Math.pow((cx - vn.vx) / 900, 2)) : 0;
@@ -422,6 +424,7 @@ export function drawBackdrop(ctx: C, camX: number, viewW: number, t: number, nig
     ctx.lineTo(x - 11 * s, y + 2);
     ctx.fill();
   }
+  drawArkLayer(ctx, camX, viewW, t, night, hillTint[0], arkPairs);
   ridge(ctx, 0.8, camX, viewW, HORIZON + 10, 38, hillTint[1], 11.3);
 }
 
